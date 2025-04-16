@@ -4,7 +4,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import SectionHeader from "@/app/home/SectionHeader";
+import SectionHeader from "@/app/(landingpage)/home/SectionHeader";
 
 export default function FrequentlyAskedQuestions() {
   return (

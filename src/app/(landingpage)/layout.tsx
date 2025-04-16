@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { Fira_Code, Belanosima } from "next/font/google";
-import "./globals.css";
+import "../globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
-import Footer from "@/app/home/Footer";
-import Navbar from "@/app/home/Navbar";
+import Footer from "@/app/(landingpage)/home/Footer";
+import Navbar from "@/app/(landingpage)/home/Navbar";
 
 const firaCode = Fira_Code({
   variable: "--font-fira-code",

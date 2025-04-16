@@ -1,10 +1,8 @@
-import Hero from "@/app/home/Hero"
-import Navbar from "@/app/home/Navbar"
-import HowItWorks from "@/app/home/HowItWorks"
-import FAQ from "@/app/home/FrequentlyAskedQuestions"
-import Message from "@/app/home/Message";
-import WhatWeCanDo from "@/app/home/WhatWeCanDo"
-import Footer from "@/app/home/Footer"
+import Hero from "@/app/(landingpage)/home/Hero"
+import HowItWorks from "@/app/(landingpage)/home/HowItWorks"
+import FAQ from "@/app/(landingpage)/home/FrequentlyAskedQuestions"
+import Message from "@/app/(landingpage)/home/Message";
+import WhatWeCanDo from "@/app/(landingpage)/home/WhatWeCanDo"
 
 export default function Home() {
   return (

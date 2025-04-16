@@ -1,4 +1,4 @@
-import SectionHeader from "@/app/home/SectionHeader";
+import SectionHeader from "@/app/(landingpage)/home/SectionHeader";
 import { CodeBlock } from "@/components/ui/code-block";
 import Image from "next/image";
 
