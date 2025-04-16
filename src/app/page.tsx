@@ -1,5 +1,9 @@
-import Hero from "@/components/Hero"
-import Navbar from "@/components/Navbar"
+import Hero from "@/app/home/Hero"
+import Navbar from "@/app/home/Navbar"
+import HowItWorks from "@/app/home/HowItWorks"
+import FAQ from "@/app/home/FrequentlyAskedQuestions"
+import WhatWeCanDo from "@/app/home/WhatWeCanDo"
+import Footer from "@/app/home/Footer"
 
 export default function Home() {
   return (
@@ -7,6 +11,10 @@ export default function Home() {
       <div>
         <Navbar />
         <Hero />
+        <HowItWorks />
+        <WhatWeCanDo />
+        <FAQ />
+        <Footer />
       </div>
     </main>
   )
