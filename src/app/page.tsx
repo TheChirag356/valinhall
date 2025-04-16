@@ -10,13 +10,11 @@ export default function Home() {
   return (
     <main className="min-h-dvh relative overflow-hidden font-[family-name:var(--font-fira-code)] bg-[#e8e8e8] dark:bg-[#181818]">
       <div>
-        <Navbar />
         <Hero />
         <HowItWorks />
         <WhatWeCanDo />
         <FAQ />
         <Message />
-        <Footer />
       </div>
     </main>
   )

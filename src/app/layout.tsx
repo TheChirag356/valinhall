@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Fira_Code, Belanosima } from "next/font/google";
 import "./globals.css";
-import { ThemeProvider } from "@/components/theme-provider"
+import { ThemeProvider } from "@/components/theme-provider";
+import Footer from "@/app/home/Footer";
+import Navbar from "@/app/home/Navbar";
 
 const firaCode = Fira_Code({
   variable: "--font-fira-code",
@@ -15,7 +17,10 @@ const belanosima = Belanosima({
 });
 
 export const metadata: Metadata = {
-  title: "Valinhall - AI Penetration Testing",
+  title: {
+    default: "Valinhall - AI Penetration Testing",
+    template: "%s | Valinhall",
+  },
   description: "Identify vulnerabilities in your web applications with AI.",
 };
 
@@ -27,16 +32,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${firaCode.variable} ${belanosima.variable} antialiased`}
+        className={`${firaCode.variable} ${belanosima.variable} antialiased bg-[#181818]`}
       >
         <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <Navbar />
+          {children}
+          <Footer />
+        </ThemeProvider>
       </body>
     </html>
   );

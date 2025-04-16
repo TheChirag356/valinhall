@@ -1,5 +1,5 @@
-"use client"; // if you're using app directory (Next.js 13+)
-
+"use client";
+import Image from "next/image";
 import React, { useEffect, useState } from "react";
 
 export default function Footer() {
@@ -23,10 +23,17 @@ export default function Footer() {
   }, []);
 
   return (
-    <footer className="text-white p-4 text-center flex items-center justify-between">
+    <div className="text-white p-4 text-center flex items-start justify-between font-[family-name:var(--font-fira-code)] h-26 relative overflow-hidden">
       <p>@Valinhall</p>
       <p>{`Time → ${time || "Loading..."}`}</p>
       <p>contact@valinhall.xyz</p>
-    </footer>
+      <Image
+        src={"/illustration3.svg"}
+        alt="footer illustration"
+        width={500}
+        height={500}
+        className="absolute left-1/3 top-16 animate-spin"
+      ></Image>
+    </div>
   );
 }
