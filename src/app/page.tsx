@@ -2,6 +2,7 @@ import Hero from "@/app/home/Hero"
 import Navbar from "@/app/home/Navbar"
 import HowItWorks from "@/app/home/HowItWorks"
 import FAQ from "@/app/home/FrequentlyAskedQuestions"
+import Message from "@/app/home/Message";
 import WhatWeCanDo from "@/app/home/WhatWeCanDo"
 import Footer from "@/app/home/Footer"
 
@@ -14,6 +15,7 @@ export default function Home() {
         <HowItWorks />
         <WhatWeCanDo />
         <FAQ />
+        <Message />
         <Footer />
       </div>
     </main>

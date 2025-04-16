@@ -12,13 +12,6 @@ export default function Box({ children }: { children: React.ReactNode }) {
         </div>
       </div>
       <div className="p-4 bg-white">
-        {/* <Image
-          src="/placeholder.svg?height=250&width=400"
-          alt="Stripe CLI visualization"
-          width={400}
-          height={250}
-          className="w-full h-auto"
-        /> */}
         {children}
       </div>
     </div>
