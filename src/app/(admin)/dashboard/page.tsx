@@ -32,12 +32,28 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import axios from "axios";
 
-const frameworks = [
+type Project = {
+  id: number;
+  name: string;
+};
+
+// const response = await axios.get<Project[]>("/api/projectname", {
+//   params: { userId: "12345" },
+// });
+
+// const projects = response.data;
+
+const projects = [
   {
-    value: "he23ljio23oi1", // projectId
-    label: "HLNA",
+    id: 2353636,
+    name: "HLNA",
   },
+  {
+    id: 8898697,
+    name: "Valinhall",
+  }
 ];
 
 export default function Projects() {
@@ -64,8 +80,7 @@ export default function Projects() {
                 className="w-[200px] justify-between"
               >
                 {value
-                  ? frameworks.find((framework) => framework.value === value)
-                      ?.label
+                  ? projects.find((framework) => framework.id === id)?.name
                   : "Select your project..."}
                 <ChevronsUpDown className="opacity-50" />
               </Button>
@@ -79,20 +94,20 @@ export default function Projects() {
                 <CommandList>
                   <CommandEmpty>No Project found.</CommandEmpty>
                   <CommandGroup>
-                    {frameworks.map((framework) => (
+                    {projects.map((framework) => (
                       <CommandItem
-                        key={framework.value}
-                        value={framework.value}
+                        key={framework.id}
+                        value={framework.name}
                         onSelect={(currentValue) => {
                           setValue(currentValue === value ? "" : currentValue);
                           setOpen(false);
                         }}
                       >
-                        {framework.label}
+                        {framework.name}
                         <Check
                           className={cn(
                             "ml-auto",
-                            value === framework.value
+                            value === framework.name
                               ? "opacity-100"
                               : "opacity-0"
                           )}

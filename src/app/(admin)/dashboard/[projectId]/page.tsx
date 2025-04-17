@@ -8,6 +8,35 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar"
 
+import type { Metadata } from "next";
+import axios from "axios";
+import { notFound } from "next/navigation";
+
+type Props = {
+  params: { projectId: string };
+};
+
+export const generateMetadata = async ({
+  params,
+}: Props): Promise<Metadata> => {
+  const { projectId } = params;
+
+  try {
+    const response = await axios.get("/api/projects/projectname", {
+      params: { projectId },
+    });
+
+    const projectName = response.data.name;
+
+    return {
+      title: `${projectName} | Valinhall`,
+    };
+  } catch (error) {
+    console.error("Error fetching project name:", error);
+    notFound();
+  }
+};
+
 import data from "./data.json"
 
 export default function Page() {
