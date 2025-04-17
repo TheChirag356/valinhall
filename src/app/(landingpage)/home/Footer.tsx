@@ -25,14 +25,14 @@ export default function Footer() {
   return (
     <div className="text-white p-4 text-center flex items-start justify-between font-[family-name:var(--font-fira-code)] h-26 relative overflow-hidden">
       <p>@Valinhall</p>
-      <p>{`Time → ${time || "Loading..."}`}</p>
+      <p className="hidden md:block">{`Time → ${time || "Loading..."}`}</p>
       <p>contact@valinhall.xyz</p>
       <Image
         src={"/illustration3.svg"}
         alt="footer illustration"
         width={500}
         height={500}
-        className="absolute left-1/3 top-16 animate-spin"
+        className="absolute md:left-1/3 top-16 animate-spin"
       ></Image>
     </div>
   );

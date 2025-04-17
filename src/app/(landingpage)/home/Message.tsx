@@ -5,7 +5,7 @@ const words = `Valinhall lets you move faster by making sure your application is
 `;
 
 export default function Message() {
-  return <div className="flex flex-col items-center justify-center relative mt-18 mb-18 w-full px-32">
-      <TextGenerateEffect words={words} className="text-xl font-medium" />
+  return <div className="flex flex-col items-center justify-center relative mt-18 mb-18 w-full px-16 md:px-32">
+      <TextGenerateEffect words={words} className="!text-md md:text-xl font-light md:font-medium" />
   </div>;
 }
