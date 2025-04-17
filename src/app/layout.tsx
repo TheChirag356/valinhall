@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { Fira_Code, Belanosima } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";

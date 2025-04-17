@@ -4,7 +4,7 @@ export default function ContactPage() {
       <h1 className="text-4xl font-bold text-center font-[family-name:var(--font-belanosima)] uppercase">
         Contact Us
       </h1>
-      <p className="text-center mt-4">We'd love to hear from you!</p>
+      <p className="text-center mt-4">We&apos;d love to hear from you!</p>
       <form className="max-w-lg mx-auto mt-5 p-6">
         <div className="mb-4">
           <label

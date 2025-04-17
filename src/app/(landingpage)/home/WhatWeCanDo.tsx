@@ -4,13 +4,9 @@
 import SectionHeader from "./SectionHeader";
 import { cn } from "@/lib/utils";
 import {
-  IconAdjustmentsBolt,
   IconCloud,
-  IconCurrencyDollar,
   IconEaseInOut,
-  IconHeart,
   IconHelp,
-  IconRouteAltLeft,
   IconTerminal2,
 } from "@tabler/icons-react";
 
@@ -26,18 +22,18 @@ export default function WhatWeCanDo() {
       title: "Comprehensive Scanning",
       description:
         "Find vulnerabilities in your live websites and their subdomains all at once",
-      icon: <IconTerminal2 />,
+      icon: <IconCloud />,
     },
     {
       title: "AI Penetration Testing",
       description: "On-demand, regardless of your company size",
-      icon: <IconTerminal2 />,
+      icon: <IconEaseInOut />,
     },
     {
       title: "User-Friendly Interface",
       description:
         "Friendly interface that doesn't bombard you with security jargon (almost)",
-      icon: <IconTerminal2 />,
+      icon: <IconHelp />,
     },
   ];
 

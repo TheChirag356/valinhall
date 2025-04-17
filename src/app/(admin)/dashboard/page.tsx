@@ -32,7 +32,6 @@ import {
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import axios from "axios";
 
 type Project = {
   id: number;
@@ -45,7 +44,7 @@ type Project = {
 
 // const projects = response.data;
 
-const projects = [
+const projects: Project[] = [
   {
     id: 2353636,
     name: "HLNA",

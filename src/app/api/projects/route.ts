@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import axios from "axios";
+import axios, { isAxiosError } from "axios";
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -15,8 +15,13 @@ export async function GET(req: NextRequest) {
     });
 
     return NextResponse.json(response.data);
-  } catch (error: any) {
-    console.error("Error fetching projects:", error.message || error);
+  } catch (error) {
+    if (isAxiosError(error)) {
+      console.error("Axios error fetching projects:", error.response?.data || error.message);
+    } else {
+      console.error("Unexpected error fetching projects:", error);
+    }
+
     return NextResponse.json(
       { error: "Failed to fetch projects from backend" },
       { status: 500 }

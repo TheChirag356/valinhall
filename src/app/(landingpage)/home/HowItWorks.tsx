@@ -22,14 +22,14 @@ export default function HowItWorks() {
           <p>Regular Expression Denial of Service (ReDoS) vulnerability</p>
           <CodeBlock lines={ReDos} highlightLines={[3]} />
           <p className="text-yellow-400">
-            Impact: Input like `"a".repeat(10000) + "!"` causes excessive
+            {`Impact: Input like \`"a".repeat(10000) + "!"\` causes excessive
             backtracking in the regex engine, potentially freezing the event
-            loop and leading to a denial of service.
+            loop and leading to a denial of service.`}
           </p>
           <p className="text-green-400">
-            Mitigation: Avoid nested quantifiers in regex patterns. Use safer
-            patterns like `/^[a-zA-Z]+$/` or limit input length before applying
-            regex.
+            {`Mitigation: Avoid nested quantifiers in regex patterns. Use safer
+            patterns like \`/^[a-zA-Z]+$/\` or limit input length before applying
+            regex.`}
           </p>
         </div>
       </div>
