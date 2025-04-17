@@ -1,12 +1,48 @@
+import { AppSidebar } from "@/components/app-sidebar"
+import { ChartAreaInteractive } from "@/components/chart-area-interactive"
+import { DataTable } from "@/components/data-table"
+import { SectionCards } from "@/components/section-cards"
+import { SiteHeader } from "@/components/site-header"
+import {
+  SidebarInset,
+  SidebarProvider,
+} from "@/components/ui/sidebar"
+
+import data from "./data.json"
+
 export default function RootLayout({
   children,
+  dashboard,
+  liveuritesting,
+  staticanalysis,
 }: {
   children: React.ReactNode;
+  dashboard: React.ReactNode;
+  liveuritesting: React.ReactNode;
+  staticanalysis: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
-    </html>
+    <SidebarProvider
+      style={
+        {
+          "--sidebar-width": "calc(var(--spacing) * 72)",
+          "--header-height": "calc(var(--spacing) * 12)",
+        } as React.CSSProperties
+      }
+    >
+      <AppSidebar variant="inset" />
+      <SidebarInset>
+        <SiteHeader />
+        <div className="flex flex-1 flex-col">
+          <div className="@container/main flex flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
+              <SectionCards />
+              <DataTable data={data} />
+            </div>
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
   );
 }
 
@@ -14,23 +50,23 @@ import type { Metadata } from "next";
 import axios from "axios";
 import { notFound } from "next/navigation";
 
-export const generateMetadata = async ({
-  params,
-}: { params: Promise<{ projectId: number }>}): Promise<Metadata> => {
-  const { projectId } = await params
+// export const generateMetadata = async ({
+//   params,
+// }: { params: Promise<{ projectId: number }>}): Promise<Metadata> => {
+//   const { projectId } = await params
 
-  try {
-    const response = await axios.get("/api/projects/projectname", {
-      params: { projectId },
-    });
+//   try {
+//     const response = await axios.get("/api/projects/projectname", {
+//       params: { projectId },
+//     });
 
-    const projectName = response.data.name;
+//     const projectName = response.data.name;
 
-    return {
-      title: `${projectName} | Valinhall`,
-    };
-  } catch (error) {
-    console.error("Error fetching project name:", error);
-    notFound();
-  }
-};
+//     return {
+//       title: `${projectName} | Valinhall`,
+//     };
+//   } catch (error) {
+//     console.error("Error fetching project name:", error);
+//     notFound();
+//   }
+// };

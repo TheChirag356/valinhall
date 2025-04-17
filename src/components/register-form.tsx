@@ -1,11 +1,10 @@
-"use client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 // import { Input } from "@/components/ui/input";
 // import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { signIn } from "@/auth";
-import { redirect } from "next/dist/server/api-utils";
+import { redirect } from "next/navigation";
 import axios from "axios";
 
 export function RegisterForm({
@@ -15,18 +14,13 @@ export function RegisterForm({
   const handleSubmit = async (event: React.FormEvent) => {
     try {
       console.log("hi");
-      await fetch(
-        `https://29d8-49-205-174-188.ngrok-free.app/api/auth/github/authorize`,
-        {
-          method: "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Accept: "application/json",
-          },
-        }
-      ).then((response) => {
+      let res = await axios.get("/api/auth/github/authorize").then((response) => {
         console.log(response);
+        return response;
       });
+
+      window.location.href = res.data.authorization_url;
+
     } catch (e) {
       console.log(e);
     }
