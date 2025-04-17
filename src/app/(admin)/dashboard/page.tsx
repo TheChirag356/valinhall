@@ -58,7 +58,7 @@ const projects = [
 
 export default function Projects() {
   const [open, setOpen] = React.useState(false);
-  const [value, setValue] = React.useState("");
+  const [value, setValue] = React.useState<number | null>(null);
   const [newProjectName, setNewProjectName] = React.useState("Project Name");
   const [newProjectDescription, setNewProjectDescription] = React.useState(
     "Project Description"
@@ -80,7 +80,7 @@ export default function Projects() {
                 className="w-[200px] justify-between"
               >
                 {value
-                  ? projects.find((project) => project.name === value)?.name
+                  ? projects.find((project) => project.id === value)?.name
                   : "Select your project..."}
                 <ChevronsUpDown className="opacity-50" />
               </Button>
@@ -100,7 +100,10 @@ export default function Projects() {
                         key={project.id}
                         value={project.name}
                         onSelect={(currentValue) => {
-                          setValue(currentValue === value ? "" : currentValue);
+                          const selected = projects.find(
+                            (p) => p.name === currentValue
+                          );
+                          setValue(selected?.id ?? null);
                           setOpen(false);
                         }}
                       >
@@ -108,7 +111,7 @@ export default function Projects() {
                         <Check
                           className={cn(
                             "ml-auto",
-                            value === project.name ? "opacity-100" : "opacity-0"
+                            value === project.id ? "opacity-100" : "opacity-0"
                           )}
                         />
                       </CommandItem>
