@@ -21,7 +21,7 @@ export const metadata: Metadata = {
     default: "Valinhall - AI Penetration Testing",
     template: "%s | Valinhall",
   },
-  description: "Identify vulnerabilities in your web applications with AI.",
+  description: "Identify vulnerabilities in your web applications with AI."
 };
 
 export default function RootLayout({

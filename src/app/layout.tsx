@@ -13,26 +13,25 @@ const belanosima = Belanosima({
   weight: ["400", "700"],
 });
 
-
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
   return (
     <html lang="en" suppressHydrationWarning>
-          <body
-            className={`${firaCode.variable} ${belanosima.variable} antialiased bg-[#181818]`}
-          >
-            <ThemeProvider
-              attribute="class"
-              defaultTheme="system"
-              enableSystem
-              disableTransitionOnChange
-            >
-              {children}
-            </ThemeProvider>
-          </body>
-        </html>
-  )
+      <body
+        className={`${firaCode.variable} ${belanosima.variable} antialiased bg-[#181818]`}
+      >
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          {children}
+        </ThemeProvider>
+      </body>
+    </html>
+  );
 }
