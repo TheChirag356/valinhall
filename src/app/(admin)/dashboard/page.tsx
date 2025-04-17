@@ -53,7 +53,7 @@ const projects = [
   {
     id: 8898697,
     name: "Valinhall",
-  }
+  },
 ];
 
 export default function Projects() {
@@ -80,11 +80,12 @@ export default function Projects() {
                 className="w-[200px] justify-between"
               >
                 {value
-                  ? projects.find((framework) => framework.id === id)?.name
+                  ? projects.find((project) => project.name === value)?.name
                   : "Select your project..."}
                 <ChevronsUpDown className="opacity-50" />
               </Button>
             </PopoverTrigger>
+
             <PopoverContent className="w-[200px] p-0">
               <Command>
                 <CommandInput
@@ -92,24 +93,22 @@ export default function Projects() {
                   className="h-9"
                 />
                 <CommandList>
-                  <CommandEmpty>No Project found.</CommandEmpty>
+                  <CommandEmpty>No project found.</CommandEmpty>
                   <CommandGroup>
-                    {projects.map((framework) => (
+                    {projects.map((project) => (
                       <CommandItem
-                        key={framework.id}
-                        value={framework.name}
+                        key={project.id}
+                        value={project.name}
                         onSelect={(currentValue) => {
                           setValue(currentValue === value ? "" : currentValue);
                           setOpen(false);
                         }}
                       >
-                        {framework.name}
+                        {project.name}
                         <Check
                           className={cn(
                             "ml-auto",
-                            value === framework.name
-                              ? "opacity-100"
-                              : "opacity-0"
+                            value === project.name ? "opacity-100" : "opacity-0"
                           )}
                         />
                       </CommandItem>
