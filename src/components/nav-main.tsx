@@ -1,8 +1,9 @@
 "use client"
 
 import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react"
-
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { useProjectStore } from '@/store/useProjectStore'
 import {
   SidebarGroup,
   SidebarGroupContent,
@@ -10,6 +11,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import { usePathname } from "next/navigation"
 
 export function NavMain({
   items,
@@ -20,16 +22,22 @@ export function NavMain({
     icon?: Icon
   }[]
 }) {
+  const { selectedNav, setSelectedNav } = useProjectStore()
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton tooltip={item.title}>
-                {item.icon && <item.icon />}
-                <span>{item.title}</span>
-              </SidebarMenuButton>
+              <Link
+                href={`/dashboard/${usePathname().split("/")[2]}/${item.url}`}
+                onClick={() => setSelectedNav(item.url)}
+              >
+                <SidebarMenuButton tooltip={item.title}>
+                  {item.icon && <item.icon />}
+                  <span>{item.title}</span>
+                </SidebarMenuButton>
+              </Link>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>

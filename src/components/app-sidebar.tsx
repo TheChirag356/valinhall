@@ -41,18 +41,18 @@ const data = {
   },
   navMain: [
     {
-      title: "Dashboard",
-      url: "#",
+      title: "Overview",
+      url: "/",
       icon: IconDashboard,
     },
     {
       title: "Static Analysis",
-      url: "/dashboard",
+      url: "/staticanalysis",
       icon: IconListDetails,
     },
     {
       title: "Live URI Testing",
-      url: "#",
+      url: "/liveuritesting",
       icon: IconChartBar,
     },
     {

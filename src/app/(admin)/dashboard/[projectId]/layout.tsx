@@ -1,26 +1,26 @@
-import { AppSidebar } from "@/components/app-sidebar"
-import { ChartAreaInteractive } from "@/components/chart-area-interactive"
-import { DataTable } from "@/components/data-table"
-import { SectionCards } from "@/components/section-cards"
-import { SiteHeader } from "@/components/site-header"
-import {
-  SidebarInset,
-  SidebarProvider,
-} from "@/components/ui/sidebar"
+"use client";
+import { AppSidebar } from "@/components/app-sidebar";
+import { ChartAreaInteractive } from "@/components/chart-area-interactive";
+import { DataTable } from "@/components/data-table";
+import { SectionCards } from "@/components/section-cards";
+import { SiteHeader } from "@/components/site-header";
+import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
-import data from "./data.json"
+import { useProjectStore } from '@/store/useProjectStore'
 
-export default function RootLayout({
+
+export default function Page({
   children,
-  dashboard,
+  overview,
   liveuritesting,
   staticanalysis,
 }: {
-  children: React.ReactNode;
-  dashboard: React.ReactNode;
+  children: React.ReactNode; // <- fallback/default route content
+  overview: React.ReactNode;
   liveuritesting: React.ReactNode;
   staticanalysis: React.ReactNode;
 }) {
+  const { selectedNav, setSelectedNav } = useProjectStore()
   return (
     <SidebarProvider
       style={
@@ -31,42 +31,7 @@ export default function RootLayout({
       }
     >
       <AppSidebar variant="inset" />
-      <SidebarInset>
-        <SiteHeader />
-        <div className="flex flex-1 flex-col">
-          <div className="@container/main flex flex-1 flex-col gap-2">
-            <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6">
-              <SectionCards />
-              <DataTable data={data} />
-            </div>
-          </div>
-        </div>
-      </SidebarInset>
+      {overview}
     </SidebarProvider>
   );
 }
-
-import type { Metadata } from "next";
-import axios from "axios";
-import { notFound } from "next/navigation";
-
-// export const generateMetadata = async ({
-//   params,
-// }: { params: Promise<{ projectId: number }>}): Promise<Metadata> => {
-//   const { projectId } = await params
-
-//   try {
-//     const response = await axios.get("/api/projects/projectname", {
-//       params: { projectId },
-//     });
-
-//     const projectName = response.data.name;
-
-//     return {
-//       title: `${projectName} | Valinhall`,
-//     };
-//   } catch (error) {
-//     console.error("Error fetching project name:", error);
-//     notFound();
-//   }
-// };
