@@ -1,15 +1,18 @@
+"use client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-// import { Input } from "@/components/ui/input";
-// import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import axios from "axios";
+import { NextResponse, NextRequest } from "next/server";
 
 export function RegisterForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
   const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
     try {
       console.log("hi");
       const res = await axios
@@ -22,6 +25,22 @@ export function RegisterForm({
       window.location.href = res.data.authorization_url;
     } catch (e) {
       console.log(e);
+    }
+  };
+
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault();
+    const formData = new FormData(event.target as HTMLFormElement);
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    try {
+      let res = await axios.post("/api/auth/register", {
+        email,
+        password,
+      });
+      return NextResponse.redirect(new URL("/dashboard"));
+    } catch (error) {
+      console.log(error);
     }
   };
 
@@ -40,7 +59,7 @@ export function RegisterForm({
               </Link>
             </div>
           </div>
-          {/* <div className="flex flex-col gap-6">
+          <div className="flex flex-col gap-6">
             <div className="grid gap-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -53,16 +72,20 @@ export function RegisterForm({
             <div className="grid gap-2">
               <div className="flex items-center">
                 <Label htmlFor="password">Password</Label>
-                <a
-                  href="#"
+                <Link
+                  href="/api/auth/forgot-password"
                   className="ml-auto text-sm underline-offset-2 hover:underline"
                 >
                   Forgot your password?
-                </a>
+                </Link>
               </div>
               <Input id="password" type="password" required />
             </div>
-            <Button type="submit" className="w-full">
+            <Button
+              type="submit"
+              className="w-full cursor-pointer"
+              onClick={handleLogin}
+            >
               Login
             </Button>
           </div>
@@ -70,7 +93,7 @@ export function RegisterForm({
             <span className="relative z-10 bg-[#181818] px-2 text-muted-foreground">
               Or
             </span>
-          </div> */}
+          </div>
           <div
             className="w-full cursor-pointer flex gap-2 justify-center items-center border-hsla py-4"
             onClick={handleSubmit}

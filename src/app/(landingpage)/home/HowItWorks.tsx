@@ -14,9 +14,16 @@ export default function HowItWorks() {
     <div className="flex flex-col items-center justify-center relative">
       <SectionHeader text="how it works" className="mt-18 w-full px-6" />
       <div className="flex flex-col lg:flex-row justify-center items-center w-7xl min-h-[26rem] mt-24 mb-24 gap-4 z-10">
-        <div className="bg-black w-1/2 h-full rounded-md border-1 border-[#262626] p-6"></div>
-        <div className="bg-black w-1/2 h-full rounded-md border-1 border-[#262626] p-6">
+        {/* <div className="bg-black w-1/2 h-full rounded-md border-1 border-[#262626] p-6">
           <h1 className="font-[family-name:var(--font-belanosima)] text-2xl">
+            Choose your Security Approach
+          </h1>
+          <div>
+            
+          </div>
+        </div> */}
+        <div className="bg-black w-1/2 h-full rounded-md border-1 border-[#262626] p-6">
+          <h1 className="font-[family-name:var(--font -belanosima)] text-2xl">
             Vulnerability Report
           </h1>
           <p>Regular Expression Denial of Service (ReDoS) vulnerability</p>

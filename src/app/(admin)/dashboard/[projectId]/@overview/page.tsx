@@ -17,10 +17,16 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { FileUpload } from "@/components/ui/file-upload";
 
 export default function OverviewPage() {
   const [name, setName] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const handleFileUpload = (files: File[]) => {
+    setFiles(files);
+    console.log(files);
+  };
   return (
     <div className="flex flex-1 flex-col justify-items-start items-center p-8">
       <h1 className="font-[family-name:var(--font-belanosima)] text-3xl mb-2">
@@ -31,34 +37,9 @@ export default function OverviewPage() {
         insights.
       </div>
 
-      <div className="flex flex-col gap-4 mt-4 h-full max-w-2xl justify-center items-center">
-          <Dialog>
-            <DialogTrigger>Click To Upload OpenAPI Spec</DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Drag and Drop the file here</DialogTitle>
-              </DialogHeader>
-              <div className="mt-4 p-4 border border-dashed rounded-lg text-center">
-                <label
-                  htmlFor="fileUpload"
-                  className="cursor-pointer text-white hover:underline"
-                >
-                  Click To Upload Spec
-                </label>
-                <p className="text-sm text-muted-foreground">or drag and drop</p>
-                <Input
-                  id="fileUpload"
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => setFile(e.target.files?.[0] || null)}
-                />
-                {file && (
-                  <p className="mt-2 text-sm text-green-600">File: {file.name}</p>
-                )}
-              </div>
-            </DialogContent>
-          </Dialog>
-      </div>
+      <div className="w-full max-w-4xl mx-auto min-h-96 border border-dashed border-neutral-200 dark:border-neutral-800 rounded-lg">
+      <FileUpload onChange={handleFileUpload} />
+    </div>
     </div>
   );
 }

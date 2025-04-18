@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 // import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { signIn } from "@/auth";
+import { usePathname } from "next/navigation";
 
 export function LoginForm({
   className,
@@ -12,15 +13,16 @@ export function LoginForm({
 }: React.ComponentPropsWithoutRef<"div">) {
   const handleSubmit = async (event: React.FormEvent) => {
     try {
-      console.log("hi");
-      const res = await axios
-        .get("/api/auth/github/authorize")
-        .then((response) => {
-          console.log(response);
-          return response;
-        });
+      // console.log("hi");
+      // const res = await axios
+      //   .get("/api/auth/github/authorize")
+      //   .then((response) => {
+      //     console.log(response);
+      //     return response;
+      //   });
 
-      window.location.href = res.data.authorization_url;
+      window.location.href = "/dashboard";
+      // window.location.href = res.data.authorization_url;
     } catch (e) {
       console.log(e);
     }
