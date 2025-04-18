@@ -34,7 +34,7 @@ export function RegisterForm({
     const email = formData.get("email") as string;
     const password = formData.get("password") as string;
     try {
-      let res = await axios.post("/api/auth/register", {
+      const res = await axios.post("/api/auth/register", {
         email,
         password,
       });
