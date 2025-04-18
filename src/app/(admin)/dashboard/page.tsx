@@ -63,6 +63,19 @@ export default function Projects() {
     "Project Description"
   );
 
+  React.useEffect(() => {
+    if (value) {
+      const selectedProject = projects.find((project) => project.id === value);
+      if (selectedProject) {
+        setNewProjectName(selectedProject.name);
+        setNewProjectDescription(selectedProject.name);
+      }
+    } else {
+      setNewProjectName("Project Name");
+      setNewProjectDescription("Project Description");
+    }
+  }, [value])
+
   return (
     <div className="flex justify-center items-center flex-col relative h-dvh bg-[#e8e8e8] dark:bg-[#181818]">
       <div className="min-h-56 w-1/3 bg-black rounded-2xl flex flex-col justify-center items-center gap-4 p-6 border-1 border-[#262626]">
