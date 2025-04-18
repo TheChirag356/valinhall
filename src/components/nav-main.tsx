@@ -1,28 +1,29 @@
-"use client"
+"use client";
 
-import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { useProjectStore } from '@/store/useProjectStore'
+import { IconCirclePlusFilled, IconMail, type Icon } from "@tabler/icons-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { useProjectStore } from "@/store/useProjectStore";
 import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { usePathname } from "next/navigation"
+} from "@/components/ui/sidebar";
+import { usePathname } from "next/navigation";
 
 export function NavMain({
   items,
 }: {
   items: {
-    title: string
-    url: string
-    icon?: Icon
-  }[]
+    title: string;
+    url: string;
+    icon?: Icon;
+  }[];
 }) {
-  const { selectedNav, setSelectedNav } = useProjectStore()
+  const { selectedNav, setSelectedNav } = useProjectStore();
+  const projectId = usePathname().split("/")[2];
   return (
     <SidebarGroup>
       <SidebarGroupContent className="flex flex-col gap-2">
@@ -30,7 +31,7 @@ export function NavMain({
           {items.map((item) => (
             <SidebarMenuItem key={item.title}>
               <Link
-                href={`/dashboard/${usePathname().split("/")[2]}/${item.url}`}
+                href={`/dashboard/${projectId}/${item.url}`}
                 onClick={() => setSelectedNav(item.url)}
               >
                 <SidebarMenuButton tooltip={item.title}>
@@ -43,5 +44,5 @@ export function NavMain({
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
-  )
+  );
 }

@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import axios from "axios"
 import { Button } from "@/components/ui/button";
 // import { Input } from "@/components/ui/input";
 // import { Label } from "@/components/ui/label";
@@ -9,23 +10,26 @@ export function LoginForm({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<"div">) {
+  const handleSubmit = async (event: React.FormEvent) => {
+    try {
+      console.log("hi");
+      const res = await axios
+        .get("/api/auth/github/authorize")
+        .then((response) => {
+          console.log(response);
+          return response;
+        });
+
+      window.location.href = res.data.authorization_url;
+    } catch (e) {
+      console.log(e);
+    }
+  };
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <form
-        action={async () => {
-          "use server";
-          await signIn("github");
-        }}
-      >
+      <form>
         <div className="flex flex-col gap-6">
           <div className="flex flex-col items-center gap-2">
-            <Link
-              href="#"
-              className="flex flex-col items-center gap-2 font-medium"
-            >
-              <div className="flex h-8 w-8 items-center justify-center rounded-md"></div>
-              <span className="sr-only">Acme Inc.</span>
-            </Link>
             <h1 className="text-3xl font-bold font-[family-name:var(--font-belanosima)]">
               Welcome to Valinhall
             </h1>
@@ -67,8 +71,7 @@ export function LoginForm({
               Or
             </span>
           </div> */}
-          <div className="flex justify-center items-center">
-            <Button variant="outline" className="w-full cursor-pointer" type="submit">
+            <div className="w-full cursor-pointer gap-2 flex justify-center items-center border-hsla py-4" onClick={handleSubmit}>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="24"
@@ -85,8 +88,7 @@ export function LoginForm({
                 <path d="M9 18c-4.51 2-5-2-7-2" />
               </svg>
               Continue with Github
-            </Button>
-          </div>
+            </div>
         </div>
       </form>
     </div>
