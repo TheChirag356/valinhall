@@ -8,6 +8,7 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
+		"deploy": "vite build && wrangler pages deploy",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
 		"lint": "prettier --check . && eslint .",
@@ -45,5 +46,14 @@
 		"vite-plugin-devtools-json": "^1.0.0",
 		"vitest": "^4.1.0",
 		"vitest-browser-svelte": "^2.0.2"
+	},
+	"dependencies": {
+		"@sveltejs/adapter-cloudflare": "^7.2.6",
+		"bits-ui": "^2.16.3",
+		"clsx": "^2.1.1",
+		"lucide-svelte": "^1.0.1",
+		"svelte-radix": "^3.0.2",
+		"tailwind-merge": "^3.5.0",
+		"tailwind-variants": "^3.2.2"
 	}
 }
