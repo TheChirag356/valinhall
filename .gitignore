@@ -1,0 +1,37 @@
+# Node
+node_modules/
+.pnpm-store/
+
+# SvelteKit
+.svelte-kit/
+dist/
+build/
+
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock.bak
+
+# Reports
+report/
+valinhall-report-*.html
+scan-result*.json
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
