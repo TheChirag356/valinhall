@@ -1,127 +1,133 @@
-@import 'tailwindcss';
-@plugin '@tailwindcss/forms';
-@plugin '@tailwindcss/typography';
+@import "tailwindcss";
+@plugin "@tailwindcss/forms";
+@plugin "@tailwindcss/typography";
 
-@theme {
-  /* Color Tokens */
-  --color-surface: #131313;
-  --color-surface-dim: #131313;
-  --color-surface-bright: #3a3939;
-  --color-surface-container-lowest: #0e0e0e;
-  --color-surface-container-low: #1c1b1b;
-  --color-surface-container: #201f1f;
-  --color-surface-container-high: #2a2a2a;
-  --color-surface-container-highest: #353534;
-  --color-surface-variant: #353534;
-  --color-surface-tint: #abd600;
+@custom-variant dark (&:is(.dark *));
 
-  --color-primary: #c3f400; /* Re-mapped for shadcn */
-  --color-primary-fixed: #c3f400;
-  --color-primary-fixed-dim: #abd600;
-  --color-primary-container: #c3f400;
-  --color-on-primary: #161e00; /* Re-mapped for shadcn */
-  --color-on-primary-fixed: #161e00;
-  --color-on-primary-fixed-variant: #3c4d00;
-  --color-on-primary-container: #556d00;
-  --color-inverse-primary: #506600;
+:root {
+  /* Surface / Backgrounds */
+  --background: #ffffff; /* Assuming a light mode default */
+  --foreground: #131313;
+  --card: #f5f5f5;
+  --card-foreground: #131313;
+  --popover: #ffffff;
+  --popover-foreground: #131313;
+  
+  /* Brand Colors */
+  --primary: #506600; 
+  --primary-foreground: #ffffff;
+  --secondary: #e5e2e1;
+  --secondary-foreground: #2a2a2a;
+  
+  /* UI Accents */
+  --muted: #f5f5f5;
+  --muted-foreground: #556774;
+  --accent: #e5e2e1;
+  --accent-foreground: #131313;
+  --destructive: #93000a;
+  --destructive-foreground: #ffffff;
+  
+  --border: #8e9379;
+  --input: #8e9379;
+  --ring: #abd600;
 
-  --color-secondary: #2a2a2a; /* Re-mapped for shadcn */
-  --color-secondary-fixed: #d4e5ef;
-  --color-secondary-fixed-dim: #b8c9d3;
-  --color-secondary-container: #3b4b53;
-  --color-on-secondary: #e5e2e1; /* Re-mapped for shadcn */
-  --color-on-secondary-fixed: #0d1e25;
-  --color-on-secondary-fixed-variant: #394951;
-  --color-on-secondary-container: #aabbc5;
-
-  --color-tertiary: #ffffff;
-  --color-tertiary-fixed: #d2e5f5;
-  --color-tertiary-fixed-dim: #b6c9d8;
-  --color-tertiary-container: #d2e5f5;
-  --color-on-tertiary: #21323e;
-  --color-on-tertiary-fixed: #0b1d29;
-  --color-on-tertiary-fixed-variant: #374956;
-  --color-on-tertiary-container: #556774;
-
-  --color-background: #131313;
-  --color-on-background: #e5e2e1;
-  --color-on-surface: #e5e2e1;
-  --color-on-surface-variant: #c4c9ac;
-  --color-inverse-surface: #e5e2e1;
-  --color-inverse-on-surface: #313030;
-
-  --color-outline: #8e9379;
-  --color-outline-variant: #444933;
-
-  --color-error: #ffb4ab;
-  --color-error-container: #93000a;
-  --color-on-error: #690005;
-  --color-on-error-container: #ffdad6;
-
-  /* Typography */
+  /* Typography Tokens */
   --font-headline: 'Space Grotesk', sans-serif;
   --font-body: 'Inter', sans-serif;
-  --font-label: 'Space Grotesk', sans-serif;
 
-  /* Border Radius — sharp / technical */
+  /* Technical Sharp Radius */
   --radius: 0.125rem;
-  --radius-lg: 0.25rem;
-  --radius-xl: 0.5rem;
-  --radius-full: 0.75rem;
-
-  /* shadcn-svelte css variables */
-  --color-foreground: #e5e2e1;
-  --color-card: #1c1b1b;
-  --color-card-foreground: #e5e2e1;
-  --color-popover: #2a2a2a;
-  --color-popover-foreground: #e5e2e1;
-  --color-muted: #1c1b1b;
-  --color-muted-foreground: #8e9379;
-  --color-accent: #2a2a2a;
-  --color-accent-foreground: #e5e2e1;
-  --color-destructive: #ffb4ab;
-  --color-destructive-foreground: #690005;
-  --color-border: #444933;
-  --color-input: #444933;
-  --color-ring: #c3f400;
 }
 
-/* Base styles */
-*, *::before, *::after {
-  box-sizing: border-box;
+.dark {
+  /* Surface / Backgrounds */
+  --background: #131313;
+  --foreground: #e5e2e1;
+  --card: #1c1b1b;
+  --card-foreground: #e5e2e1;
+  --popover: #2a2a2a;
+  --popover-foreground: #e5e2e1;
+
+  /* Brand Colors (The Lime Green) */
+  --primary: #c3f400;
+  --primary-foreground: #161e00;
+  --secondary: #2a2a2a;
+  --secondary-foreground: #e5e2e1;
+
+  /* UI Accents */
+  --muted: #1c1b1b;
+  --muted-foreground: #8e9379;
+  --accent: #2a2a2a;
+  --accent-foreground: #e5e2e1;
+  --destructive: #ffb4ab;
+  --destructive-foreground: #690005;
+
+  --border: #444933;
+  --input: #444933;
+  --ring: #c3f400;
 }
 
-body {
-  background-color: var(--color-background);
-  color: var(--color-foreground);
-  font-family: var(--font-body);
-  min-height: 100vh;
+@theme inline {
+  /* Map CSS Variables to Tailwind Utilities */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  /* Font Mappings */
+  --font-headline: var(--font-headline);
+  --font-sans: var(--font-body);
+
+  /* Radius Scales */
+  --radius-sm: var(--radius);
+  --radius-md: 0.25rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 }
 
-/* Utilities */
-.dot-matrix {
-  background-image: radial-gradient(circle, #444933 1px, transparent 1px);
-  background-size: 24px 24px;
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    box-sizing: border-box;
+  }
+  body {
+    @apply bg-background text-foreground font-sans min-h-screen;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-headline;
+  }
 }
 
-.glass-panel {
-  backdrop-filter: blur(20px);
-  background: rgba(28, 27, 27, 0.7);
-}
+@layer utilities {
+  .dot-matrix {
+    background-image: radial-gradient(circle, var(--color-border) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
 
-.shimmer {
-  background: linear-gradient(135deg, #c3f400 0%, #abd600 100%);
-}
+  .glass-panel {
+    backdrop-filter: blur(20px);
+    background: color-mix(in srgb, var(--color-card), transparent 30%);
+  }
 
-.font-headline {
-  font-family: var(--font-headline);
+  .shimmer {
+    background: linear-gradient(135deg, var(--color-primary) 0%, #abd600 100%);
+  }
 }
-
-.font-body {
-  font-family: var(--font-body);
-}
-
-.material-symbols-outlined {
-  font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-}
-
