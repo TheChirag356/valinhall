@@ -200,6 +200,18 @@ pub fn run(root: &str) -> Result<Vec<Finding>> {
         })
         .collect();
 
+    // Read custom ignores from .valinhallignore
+    let ignore_path = Path::new(root).join(".valinhallignore");
+    let mut custom_ignores = Vec::new();
+    if let Ok(content) = std::fs::read_to_string(ignore_path) {
+        for line in content.lines() {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() && !trimmed.starts_with('#') {
+                custom_ignores.push(trimmed.replace('\\', "/"));
+            }
+        }
+    }
+
     let files: Vec<_> = WalkDir::new(root)
         .follow_links(false)
         .into_iter()
@@ -217,6 +229,19 @@ pub fn run(root: &str) -> Result<Vec<Finding>> {
             !e.path()
                 .components()
                 .any(|c| matches!(c.as_os_str().to_str(), Some("node_modules" | "target" | ".git" | "dist" | "build" | ".svelte-kit")))
+        })
+        // Apply .valinhallignore rules
+        .filter(|e| {
+            if custom_ignores.is_empty() {
+                return true;
+            }
+            let normalized = e.path().to_string_lossy().replace('\\', "/");
+            for ig in &custom_ignores {
+                if normalized.contains(ig) {
+                    return false;
+                }
+            }
+            true
         })
         .collect();
 
