@@ -2,10 +2,10 @@
 name = "valinhall"
 version = "0.1.0"
 edition = "2021"
-authors = ["Valinhall Contributors"]
 description = "AI-Assisted Automated Security Testing Tool"
 license = "MIT"
-repository = "https://github.com/your-org/valinhall"
+repository = "https://github.com/TheChirag356/valinhall"
+keywords = ["security", "testing", "ai", "automation"]
 
 [[bin]]
 name = "valinhall"
