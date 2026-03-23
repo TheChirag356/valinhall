@@ -354,6 +354,7 @@ These rules are applied during every local codebase scan:
 | CORS Allow All Origins | 🟡 Medium | All | Wildcard `Access-Control-Allow-Origin: *` |
 | XML External Entity Risk | 🟡 Medium | All | XML parsers without explicit XXE protection |
 | Debug Mode Enabled | 🟡 Medium | Py/JS | `DEBUG=True` / `debug: true` in production configs |
+| Potential ReDoS | 🟡 Medium | All | Nested regex quantifiers `(a+)+` inside patterns |
 | Unsafe Rust Block | 🔵 Low | Rust | `unsafe {}` blocks — flagged for review |
 | Hardcoded IP Address | ⚪ Info | All | Hardcoded infrastructure IP references |
 | TODO/FIXME Security Comment | ⚪ Info | All | Unresolved security `TODO` or `FIXME` notes |

@@ -179,6 +179,14 @@ static REGEX_RULES: &[SastRule] = &[
         description: "Debug mode is enabled. In production, this exposes stack traces and internal details.",
         remediation: "Disable debug mode in production. Use environment-specific configuration.",
     },
+    SastRule {
+        name: "Potential ReDoS (Nested Quantifiers)",
+        pattern: r"/(?:[^/\\]|\\.)*\([^)]*[\+\*]\)[\+\*].*/|new RegExp\(.*?\([^)]*[\+\*]\)[\+\*].*?\)",
+        category: OwaspCategory::InsecureDesign,
+        severity: Severity::Medium,
+        description: "Nested quantifiers (e.g., `(a+)+`) in regular expressions can cause catastrophic backtracking, leading to Denial of Service (ReDoS).",
+        remediation: "Avoid nested quantifiers. Limit the input string length explicitly before running the regex, or rewrite the pattern to be deterministic.",
+    },
 ];
 
 /// Extensions for regex-based scanning
@@ -341,5 +349,12 @@ mod tests {
     fn detects_unsafe_block() {
         let findings = scan_content("unsafe { *ptr = 42; }");
         assert!(!findings.is_empty());
+    }
+
+    #[test]
+    fn detects_redos_nested_quantifiers() {
+        let findings = scan_content("const pattern = /^([a-zA-Z]+)+$/;");
+        assert!(!findings.is_empty());
+        assert_eq!(findings[0].title, "Potential ReDoS (Nested Quantifiers)");
     }
 }
