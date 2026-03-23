@@ -37,6 +37,7 @@
 		"prettier-plugin-tailwindcss": "^0.7.2",
 		"svelte": "^5.51.0",
 		"svelte-check": "^4.4.2",
+		"tailwind-variants": "^3.2.2",
 		"tailwindcss": "^4.1.18",
 		"typescript": "^5.9.3",
 		"typescript-eslint": "^8.54.0",
@@ -44,5 +45,10 @@
 		"vitest": "^4.1.0",
 		"vitest-browser-svelte": "^2.0.2",
 		"wrangler": "^4.63.0"
+	},
+	"dependencies": {
+		"bits-ui": "^2.16.3",
+		"clsx": "^2.1.1",
+		"tailwind-merge": "^3.5.0"
 	}
 }
