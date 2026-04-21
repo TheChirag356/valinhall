@@ -11,12 +11,10 @@ mod server;
 
 use engine::{dast, sast, supply};
 
-/// Valinhall — AI-Assisted Automated Security Testing Tool
 #[derive(Parser)]
 #[command(
     name = "valinhall",
     version,
-    author,
     about = "AI-Assisted Automated Security Testing Tool",
     long_about = "A high-performance security scanner covering OWASP Top 10 (2026),\nLLM red-teaming, and multi-ecosystem dependency auditing."
 )]

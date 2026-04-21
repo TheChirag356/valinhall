@@ -5,7 +5,7 @@
 	import TopNavBar from '$lib/components/TopNavBar.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 
-	let { children } = $props();
+	let { data, children } = $props();
 </script>
 
 <svelte:head>
@@ -24,12 +24,18 @@
 
 <!-- Global Layout Wrapper -->
 <div class="flex min-h-screen overflow-hidden bg-background text-on-background font-body selection:bg-primary-fixed selection:text-on-primary-fixed dark">
-	<NavSidebar />
-	<main class="flex-grow flex flex-col h-screen overflow-y-auto bg-background relative">
-		<TopNavBar />
-		<div class="p-8 space-y-8 flex-grow">
+	{#if data.user}
+		<NavSidebar />
+	{/if}
+	<main class="grow flex flex-col h-screen overflow-y-auto bg-background relative">
+		{#if data.user}
+			<TopNavBar />
+		{/if}
+		<div class="p-8 space-y-8 grow">
 			{@render children()}
 		</div>
-		<Footer />
+		{#if data.user}
+			<Footer />
+		{/if}
 	</main>
 </div>

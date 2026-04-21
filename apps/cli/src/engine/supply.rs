@@ -4,6 +4,7 @@
 //! - Node.js  (package-lock.json / yarn.lock)
 //! - Rust     (Cargo.lock via cargo_metadata)
 //! - Go       (go.sum)
+//! - Python   (requirements.txt / uv.lock) [TODO]
 
 use std::path::Path;
 
@@ -74,8 +75,6 @@ struct OsvEvent {
     fixed: Option<String>,
 }
 
-// ── Entry Point ───────────────────────────────────────────────────────────────
-
 /// Audit dependencies in `root_path` for the given ecosystems
 pub async fn audit(root_path: &str, ecosystems: &[&str]) -> Result<Vec<SupplyFinding>> {
     let client = Client::new();
@@ -111,8 +110,6 @@ pub async fn audit(root_path: &str, ecosystems: &[&str]) -> Result<Vec<SupplyFin
 
     Ok(all_findings)
 }
-
-// ── Node.js Audit ─────────────────────────────────────────────────────────────
 
 async fn audit_node(root: &Path, client: &Client) -> Result<Vec<SupplyFinding>> {
     let lock_path = root.join("package-lock.json");
