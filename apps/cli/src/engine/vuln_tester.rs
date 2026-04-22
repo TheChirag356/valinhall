@@ -69,6 +69,12 @@ async fn run_checks(client: &Client, url: &str, tout: Duration) -> Vec<Finding> 
     findings.extend(check_xss_reflection(client, url, tout).await);
     findings.extend(check_sqli_errors(client, url, tout).await);
 
+    // GraphQL Fuzzer checks
+    findings.extend(crate::engine::graphql_fuzzer::run_checks(client, url, tout).await);
+
+    // XXE injection checks
+    findings.extend(crate::engine::xxe_scanner::check(client, url, tout).await);
+
     findings
 }
 

@@ -148,6 +148,12 @@ pub enum FindingSource {
     EndpointCrawler,
     /// Automated endpoint vulnerability tester
     VulnTester,
+    /// GraphQL Introspection and Fuzzer
+    GraphqlFuzzer,
+    /// OpenAPI/Swagger spec parser and endpoint fuzzer
+    OpenApiFuzzer,
+    /// XML External Entity (XXE) injection scanner
+    XxeScanner,
 }
 
 impl FindingSource {
@@ -164,6 +170,9 @@ impl FindingSource {
             Self::PortScanner => "Port Scanner",
             Self::EndpointCrawler => "Endpoint Crawler",
             Self::VulnTester => "Vuln Tester",
+            Self::GraphqlFuzzer => "GraphQL Fuzzer",
+            Self::OpenApiFuzzer => "OpenAPI Fuzzer",
+            Self::XxeScanner => "XXE Scanner",
         }
     }
 }

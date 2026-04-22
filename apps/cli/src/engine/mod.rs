@@ -1,10 +1,13 @@
 pub mod anomaly;
 pub mod dast;
 pub mod endpoint_crawler;
+pub mod graphql_fuzzer;
 pub mod nuclei;
+pub mod openapi_fuzzer;
 pub mod osv_blackbox;
 pub mod port_scanner;
 pub mod sast;
 pub mod supply;
 pub mod vuln_tester;
 pub mod waf_mutator;
+pub mod xxe_scanner;

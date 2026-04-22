@@ -9,7 +9,7 @@ mod probes;
 mod report;
 mod server;
 
-use engine::{anomaly, dast, endpoint_crawler, nuclei, osv_blackbox, port_scanner, sast, supply, vuln_tester, waf_mutator};
+use engine::{anomaly, dast, endpoint_crawler, nuclei, openapi_fuzzer, osv_blackbox, port_scanner, sast, supply, vuln_tester, waf_mutator};
 
 #[derive(Parser)]
 #[command(
@@ -96,6 +96,10 @@ enum Commands {
         /// Auto-discover all public & private endpoints (crawl+wordlist+JS), then test each for CORS, IDOR, SSRF, path traversal, open redirect, auth bypass
         #[arg(long)]
         blackbox: bool,
+
+        /// Parse discovered OpenAPI/Swagger specs and fuzz every defined endpoint
+        #[arg(long)]
+        openapi: bool,
     },
 
     /// Audit project dependencies for known vulnerabilities (OSV.dev)
@@ -180,12 +184,13 @@ async fn main() -> Result<()> {
             timeout,
             port_scan,
             blackbox,
+            openapi,
         } => {
             cmd_scan(
                 target, output, report, sast_only, dast_only,
                 llm, nuclei, nuclei_templates, nuclei_tags,
                 osv_blackbox, anomaly, waf_mutator,
-                concurrency, timeout, port_scan, blackbox,
+                concurrency, timeout, port_scan, blackbox, openapi,
             )
             .await?;
         }
@@ -277,6 +282,7 @@ async fn cmd_scan(
     timeout: u64,
     run_port_scan: bool,
     run_blackbox: bool,
+    run_openapi: bool,
 ) -> Result<()> {
     use crate::models::{ScanConfig, ScanResult};
     use chrono::Utc;
@@ -519,6 +525,29 @@ async fn cmd_scan(
                 all_findings.extend(f);
             }
             Err(e) => println!("  {} Vuln tester error: {}", "✗".red(), e),
+        }
+    }
+
+    // ── OpenAPI / Swagger Spec Fuzzer ─────────────────────────────────────────
+    if run_openapi && (target.starts_with("http://") || target.starts_with("https://")) {
+        pb.set_message("Fetching & fuzzing OpenAPI/Swagger spec…");
+        let shared_client = std::sync::Arc::new(dast::build_client(&config)?);
+        match openapi_fuzzer::run(
+            &shared_client,
+            &config.target,
+            std::time::Duration::from_secs(config.timeout_secs),
+        )
+        .await
+        {
+            Ok(f) => {
+                println!(
+                    "  {} OpenAPI Fuzzer: {} finding(s)",
+                    "✓".green(),
+                    f.len().to_string().bold()
+                );
+                all_findings.extend(f);
+            }
+            Err(e) => println!("  {} OpenAPI fuzzer error: {}", "✗".red(), e),
         }
     }
 
