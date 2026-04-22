@@ -403,6 +403,17 @@ Triggered via `valinhall audit`.
 - Analyzes `package.json`, `Cargo.toml`, `go.mod`, etc., in a local directory.
 - Queries OSV.dev to find known vulnerabilities in the project's dependency tree.
 
+### 14. LLM Red-Teaming Engine (`probes/llm`)
+Triggered via `--llm`. Automatically discovers and rigorously stress-tests AI/LLM endpoints. Inspired by NVIDIA Garak, Promptfoo, and Trail of Bits research.
+- **Endpoint Discovery:** Hunts for AI endpoints like `/api/chat`, `/api/generate`, and infers existence from 422 Unprocessable Entity responses.
+- **Direct Prompt Injection (DPI):** Injects classic DAN prompts, overrides, and Pliny-style hypothetical jailbreaks to extract system instructions and violate constraints.
+- **Encoding & Typo-Squatting Bypass:** Evades basic regex/filter WAFs using Base64, Hex encoded payloads, and separated characters (e.g., `I-g-n-o-r-e`).
+- **Invisible Prompt Injection:** Stuffing malicious context into non-rendered `HTML <picture><source>` tags to compromise models reading web documents/issues without alerting human reviewers.
+- **Agentic Tool Call Exploitation:** Exploits AI agent capabilities via fake conversation histories (`<human_chat_interruption>`) to secretly force the agent to execute unauthorized tools (e.g., retrieving AWS metadata via curl) and promise not to log the action.
+- **PII Exfiltration:** Seeds synthetic PII (SSN, credit card, email) into early conversation turns, then issues delayed recall probes to test if the model persists or leaks data across boundaries.
+- **Hallucination & Misinformation:** Probes the model with complex fake scenarios (e.g., non-existent movies or sporting events in the future) to see if the LLM fabricates details rather than refusing to answer, indicating a lack of proper grounding.
+- **Output Injection / XSS:** Commands the LLM to write raw malicious payloads (like unescaped `<script>` tags or `javascript:` links) to detect if downstream parsers might be vulnerable to LLM-driven cross-site scripting attacks.
+
 ---
 
 ## OWASP 2026 Coverage
