@@ -134,6 +134,20 @@ pub enum FindingSource {
     Dast,
     SupplyChain,
     LlmProbe,
+    /// Nuclei YAML template runner
+    Nuclei,
+    /// OSV.dev blackbox fingerprint lookup
+    OsvBlackbox,
+    /// K-Means anomaly detection engine
+    AnomalyEngine,
+    /// LLM-powered WAF bypass mutator
+    WafMutator,
+    /// TCP port scanner with banner grabbing
+    PortScanner,
+    /// Endpoint crawler (crawl + wordlist + JS mining)
+    EndpointCrawler,
+    /// Automated endpoint vulnerability tester
+    VulnTester,
 }
 
 impl FindingSource {
@@ -143,6 +157,13 @@ impl FindingSource {
             Self::Dast => "DAST",
             Self::SupplyChain => "Supply Chain",
             Self::LlmProbe => "LLM Probe",
+            Self::Nuclei => "Nuclei Templates",
+            Self::OsvBlackbox => "OSV Blackbox",
+            Self::AnomalyEngine => "Anomaly Engine",
+            Self::WafMutator => "WAF Mutator",
+            Self::PortScanner => "Port Scanner",
+            Self::EndpointCrawler => "Endpoint Crawler",
+            Self::VulnTester => "Vuln Tester",
         }
     }
 }
@@ -154,6 +175,22 @@ pub struct ScanConfig {
     pub concurrency: usize,
     pub timeout_secs: u64,
     pub llm_probe: bool,
+    /// Run Nuclei template engine
+    pub nuclei: bool,
+    /// Path to Nuclei templates directory (None = use default)
+    pub nuclei_templates_dir: Option<String>,
+    /// Comma-separated Nuclei tag filter (empty = all templates)
+    pub nuclei_tags: Vec<String>,
+    /// Run OSV blackbox fingerprint lookup
+    pub osv_blackbox: bool,
+    /// Run K-Means anomaly detection engine
+    pub anomaly: bool,
+    /// Run WAF mutator with OpenRouter (requires OPENROUTER_API_KEY)
+    pub waf_mutator: bool,
+    /// Run TCP port scanner (all 1-10000 + hidden high ports)
+    pub port_scan: bool,
+    /// Auto-discover endpoints (crawl + wordlist + JS) then test them
+    pub blackbox: bool,
 }
 
 /// A supply-chain vulnerability finding (dependency audit)

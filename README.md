@@ -4,6 +4,8 @@
 
 A high-performance security scanner built with a Rust CLI engine and a SvelteKit web dashboard, covering OWASP Top 10 (2026 draft), LLM red-teaming, and multi-ecosystem dependency auditing.
 
+Test site: https://pentest-ground.com/
+
 ## Table of Contents
 
 - [Valinhall 🛡️](#valinhall-️)

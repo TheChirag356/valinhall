@@ -19,7 +19,7 @@ use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
-use crate::models::{Finding, ScanResult};
+use crate::models::ScanResult;
 
 #[derive(Clone)]
 struct AppState {
@@ -66,6 +66,14 @@ pub async fn start(port: u16, target: Option<String>) -> Result<()> {
                     concurrency: 20,
                     timeout_secs: 10,
                     llm_probe: false,
+                    nuclei: false,
+                    nuclei_templates_dir: None,
+                    nuclei_tags: vec![],
+                    osv_blackbox: false,
+                    anomaly: false,
+                    waf_mutator: false,
+                    port_scan: false,
+                    blackbox: false,
                 };
                 if let Ok(findings) = crate::engine::dast::run(&config).await {
                     all_findings.extend(findings);

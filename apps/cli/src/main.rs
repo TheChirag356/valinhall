@@ -9,7 +9,7 @@ mod probes;
 mod report;
 mod server;
 
-use engine::{dast, sast, supply};
+use engine::{anomaly, dast, endpoint_crawler, nuclei, osv_blackbox, port_scanner, sast, supply, vuln_tester, waf_mutator};
 
 #[derive(Parser)]
 #[command(
@@ -57,6 +57,30 @@ enum Commands {
         #[arg(long)]
         llm: bool,
 
+        /// Run Nuclei YAML template engine (requires templates directory)
+        #[arg(long)]
+        nuclei: bool,
+
+        /// Path to Nuclei templates directory (default: ~/.valinhall/nuclei-templates)
+        #[arg(long)]
+        nuclei_templates: Option<String>,
+
+        /// Only run Nuclei templates matching these tags (comma-separated, e.g. "xss,sqli")
+        #[arg(long, default_value = "")]
+        nuclei_tags: String,
+
+        /// Query OSV.dev for CVEs in fingerprinted server technologies
+        #[arg(long)]
+        osv_blackbox: bool,
+
+        /// Run K-Means anomaly detection on HTTP responses
+        #[arg(long)]
+        anomaly: bool,
+
+        /// Use OpenRouter LLM to mutate blocked payloads (requires OPENROUTER_API_KEY)
+        #[arg(long)]
+        waf_mutator: bool,
+
         /// Max concurrent HTTP requests for DAST
         #[arg(long, default_value = "20")]
         concurrency: usize,
@@ -64,6 +88,14 @@ enum Commands {
         /// Request timeout in seconds
         #[arg(long, default_value = "10")]
         timeout: u64,
+
+        /// Scan all TCP ports 1-10000 + common high-numbered hidden ports
+        #[arg(long)]
+        port_scan: bool,
+
+        /// Auto-discover all public & private endpoints (crawl+wordlist+JS), then test each for CORS, IDOR, SSRF, path traversal, open redirect, auth bypass
+        #[arg(long)]
+        blackbox: bool,
     },
 
     /// Audit project dependencies for known vulnerabilities (OSV.dev)
@@ -132,11 +164,22 @@ async fn main() -> Result<()> {
             sast_only,
             dast_only,
             llm,
+            nuclei,
+            nuclei_templates,
+            nuclei_tags,
+            osv_blackbox,
+            anomaly,
+            waf_mutator,
             concurrency,
             timeout,
+            port_scan,
+            blackbox,
         } => {
             cmd_scan(
-                target, output, report, sast_only, dast_only, llm, concurrency, timeout,
+                target, output, report, sast_only, dast_only,
+                llm, nuclei, nuclei_templates, nuclei_tags,
+                osv_blackbox, anomaly, waf_mutator,
+                concurrency, timeout, port_scan, blackbox,
             )
             .await?;
         }
@@ -183,6 +226,7 @@ fn resolve_output_path(arg: Option<&str>, filename: &str) -> std::path::PathBuf 
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn cmd_scan(
     target: String,
     output: Option<String>,
@@ -190,8 +234,16 @@ async fn cmd_scan(
     sast_only: bool,
     dast_only: bool,
     llm: bool,
+    run_nuclei: bool,
+    nuclei_templates: Option<String>,
+    nuclei_tags: String,
+    run_osv_blackbox: bool,
+    run_anomaly: bool,
+    run_waf_mutator: bool,
     concurrency: usize,
     timeout: u64,
+    run_port_scan: bool,
+    run_blackbox: bool,
 ) -> Result<()> {
     use crate::models::{ScanConfig, ScanResult};
     use chrono::Utc;
@@ -211,11 +263,25 @@ async fn cmd_scan(
     println!("  {} {}", "Started: ".dimmed(), timestamp.format("%Y-%m-%dT%H:%M:%SZ").to_string().dimmed());
     println!();
 
+    let tags: Vec<String> = nuclei_tags
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
     let config = ScanConfig {
         target: target.clone(),
         concurrency,
         timeout_secs: timeout,
         llm_probe: llm,
+        nuclei: run_nuclei,
+        nuclei_templates_dir: nuclei_templates,
+        nuclei_tags: tags,
+        osv_blackbox: run_osv_blackbox,
+        anomaly: run_anomaly,
+        waf_mutator: run_waf_mutator,
+        port_scan: run_port_scan,
+        blackbox: run_blackbox,
     };
 
     let pb = ProgressBar::new_spinner();
@@ -270,6 +336,227 @@ async fn cmd_scan(
             llm_findings.len().to_string().bold()
         );
         all_findings.extend(llm_findings);
+    }
+
+    // ── Nuclei template engine ───────────────────────────────────────────────
+    if run_nuclei {
+        pb.set_message("Running Nuclei template engine…");
+        let templates_dir = config
+            .nuclei_templates_dir
+            .as_deref()
+            .map(std::path::PathBuf::from)
+            .unwrap_or_else(nuclei::NucleiRunnerConfig::default_templates_dir);
+
+        let nuclei_cfg = nuclei::NucleiRunnerConfig {
+            target: config.target.clone(),
+            templates_dir,
+            tag_filter: config.nuclei_tags.clone(),
+            concurrency: config.concurrency,
+            timeout: std::time::Duration::from_secs(config.timeout_secs),
+        };
+
+        match nuclei::run(&nuclei_cfg).await {
+            Ok(f) => {
+                println!(
+                    "  {} Nuclei: {} finding(s)",
+                    "✓".green(),
+                    f.len().to_string().bold()
+                );
+                all_findings.extend(f);
+            }
+            Err(e) => println!("  {} Nuclei engine error: {}", "✗".red(), e),
+        }
+    }
+
+    // ── OSV blackbox fingerprint lookup ──────────────────────────────────────
+    if run_osv_blackbox && (target.starts_with("http://") || target.starts_with("https://")) {
+        pb.set_message("Querying OSV.dev for fingerprinted technologies…");
+        let shared_client = std::sync::Arc::new(dast::build_client(&config)?);
+        match osv_blackbox::check_fingerprinted_tech(shared_client, &config.target).await {
+            Ok(f) => {
+                println!(
+                    "  {} OSV Blackbox: {} finding(s)",
+                    "✓".green(),
+                    f.len().to_string().bold()
+                );
+                all_findings.extend(f);
+            }
+            Err(e) => println!("  {} OSV blackbox error: {}", "✗".red(), e),
+        }
+    }
+
+    // ── Anomaly detection engine (K-Means) ───────────────────────────────────
+    if run_anomaly && (target.starts_with("http://") || target.starts_with("https://")) {
+        pb.set_message("Running K-Means anomaly detection…");
+        let shared_client = std::sync::Arc::new(dast::build_client(&config)?);
+        let anomaly_cfg = anomaly::AnomalyConfig {
+            concurrency: config.concurrency,
+            timeout: std::time::Duration::from_secs(config.timeout_secs),
+            ..anomaly::AnomalyConfig::default()
+        };
+        match anomaly::run(shared_client, &config.target, &anomaly_cfg).await {
+            Ok(f) => {
+                println!(
+                    "  {} Anomaly: {} finding(s)",
+                    "✓".green(),
+                    f.len().to_string().bold()
+                );
+                all_findings.extend(f);
+            }
+            Err(e) => println!("  {} Anomaly engine error: {}", "✗".red(), e),
+        }
+    }
+
+    // ── Port Scanner ──────────────────────────────────────────────────────────
+    if run_port_scan && (target.starts_with("http://") || target.starts_with("https://")) {
+        pb.set_message("Scanning TCP ports (1–10000 + hidden high ports)…");
+        match port_scanner::host_from_url(&config.target) {
+            Ok(host) => {
+                let ps_cfg = port_scanner::PortScanConfig {
+                    concurrency: 500.max(config.concurrency * 10),
+                    connect_timeout: std::time::Duration::from_millis(800),
+                    banner_timeout: std::time::Duration::from_millis(1000),
+                    port_range_max: 10_000,
+                };
+                match port_scanner::run(&host, &ps_cfg).await {
+                    Ok(f) => {
+                        println!(
+                            "  {} Port Scan: {} finding(s)",
+                            "✓".green(),
+                            f.len().to_string().bold()
+                        );
+                        all_findings.extend(f);
+                    }
+                    Err(e) => println!("  {} Port scanner error: {}", "✗".red(), e),
+                }
+            }
+            Err(e) => println!("  {} Port scanner: could not parse host — {}", "✗".red(), e),
+        }
+    }
+
+    // ── Blackbox: Endpoint Crawler + Vuln Tester ──────────────────────────────
+    if run_blackbox && (target.starts_with("http://") || target.starts_with("https://")) {
+        let shared_client = std::sync::Arc::new(dast::build_client(&config)?);
+
+        pb.set_message("Discovering endpoints (crawl + wordlist + JS mining)…");
+        let crawl_cfg = endpoint_crawler::CrawlConfig {
+            concurrency: config.concurrency,
+            timeout: std::time::Duration::from_secs(config.timeout_secs),
+        };
+        let endpoints = match endpoint_crawler::discover(
+            std::sync::Arc::clone(&shared_client),
+            &config.target,
+            &crawl_cfg,
+        )
+        .await
+        {
+            Ok(eps) => {
+                println!(
+                    "  {} Endpoint Crawler: {} endpoint(s) discovered",
+                    "✓".green(),
+                    eps.len().to_string().bold()
+                );
+                eps
+            }
+            Err(e) => {
+                println!("  {} Endpoint crawler error: {}", "✗".red(), e);
+                vec![]
+            }
+        };
+
+        pb.set_message("Testing discovered endpoints for vulnerabilities…");
+        let vt_cfg = vuln_tester::VulnTestConfig {
+            concurrency: config.concurrency,
+            timeout: std::time::Duration::from_secs(config.timeout_secs),
+        };
+        match vuln_tester::test_endpoints(
+            std::sync::Arc::clone(&shared_client),
+            &endpoints,
+            &vt_cfg,
+        )
+        .await
+        {
+            Ok(f) => {
+                println!(
+                    "  {} Vuln Tester: {} finding(s) across {} endpoint(s)",
+                    "✓".green(),
+                    f.len().to_string().bold(),
+                    endpoints.len()
+                );
+                all_findings.extend(f);
+            }
+            Err(e) => println!("  {} Vuln tester error: {}", "✗".red(), e),
+        }
+    }
+
+    // ── WAF Mutator (LLM bypass) ─────────────────────────────────────────────
+    if run_waf_mutator {
+        match waf_mutator::WafMutatorConfig::from_env() {
+            Ok(waf_cfg) => {
+                pb.set_message("WAF mutator: analysing blocked payloads with LLM…");
+                let shared_client = std::sync::Arc::new(dast::build_client(&config)?);
+                let mutator = waf_mutator::WafMutator::new(shared_client, waf_cfg);
+
+                // Collect blocked findings from prior phases to attempt bypass
+                let blocked: Vec<waf_mutator::BlockedAttempt> = all_findings
+                    .iter()
+                    .filter(|f| {
+                        f.evidence
+                            .as_deref()
+                            .map(|e| e.contains("406") || e.contains("403"))
+                            .unwrap_or(false)
+                    })
+                    .filter_map(|f| {
+                        Some(waf_mutator::BlockedAttempt {
+                            endpoint: f.endpoint.clone()?,
+                            method: "GET".to_string(),
+                            original_payload: f
+                                .evidence
+                                .as_deref()
+                                .unwrap_or("")
+                                .lines()
+                                .find(|l| l.to_lowercase().contains("payload"))
+                                .and_then(|l| l.split_once(':').map(|(_, v)| v.trim().to_string()))
+                                .unwrap_or_else(|| f.title.clone()),
+                            block_status: if f
+                                .evidence
+                                .as_deref()
+                                .unwrap_or("")
+                                .contains("406")
+                            {
+                                406
+                            } else {
+                                403
+                            },
+                            response_snippet: f
+                                .evidence
+                                .clone()
+                                .unwrap_or_default(),
+                            injection_point: "q".to_string(),
+                        })
+                    })
+                    .take(5) // limit mutation budget
+                    .collect();
+
+                let mut waf_findings = Vec::new();
+                for attempt in &blocked {
+                    match mutator.mutate_and_retry(attempt).await {
+                        Ok(f) => waf_findings.extend(f),
+                        Err(e) => tracing::warn!("WAF mutator error: {}", e),
+                    }
+                }
+                println!(
+                    "  {} WAF Mutator: {} finding(s) ({} attempt(s))",
+                    "✓".green(),
+                    waf_findings.len().to_string().bold(),
+                    blocked.len()
+                );
+                all_findings.extend(waf_findings);
+            }
+            Err(e) => {
+                println!("  {} WAF Mutator skipped: {}", "ℹ".blue(), e);
+            }
+        }
     }
 
     pb.finish_and_clear();

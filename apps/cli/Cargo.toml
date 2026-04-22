@@ -60,6 +60,11 @@ console = "0.15"
 semver = { version = "1", features = ["serde"] }
 cargo_metadata = "0.18"
 
+# ML — Anomaly detection engine
+linfa             = "0.7"
+linfa-clustering  = "0.7"
+ndarray           = "0.15"
+
 # Utilities
 chrono = { version = "0.4", features = ["serde"] }
 url = { version = "2", features = ["serde"] }
