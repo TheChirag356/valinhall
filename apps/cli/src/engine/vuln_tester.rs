@@ -65,6 +65,9 @@ async fn run_checks(client: &Client, url: &str, tout: Duration) -> Vec<Finding> 
     findings.extend(check_ssrf_indicators(client, url, tout).await);
     findings.extend(check_auth_bypass(client, url, tout).await);
     findings.extend(check_idor(client, url, tout).await);
+    // Active injection checks against every live endpoint
+    findings.extend(check_xss_reflection(client, url, tout).await);
+    findings.extend(check_sqli_errors(client, url, tout).await);
 
     findings
 }
@@ -519,6 +522,295 @@ async fn check_idor(client: &Client, url: &str, tout: Duration) -> Vec<Finding> 
             }
         }
     }
+    vec![]
+}
+
+// ── XSS Reflection ──────────────────────────────────────────────────────────
+//
+// Injects XSS payloads into every query parameter of the URL (and a generic
+// ?q= param if none exist), then checks whether the payload is reflected
+// unencoded in a text/html response.  Also fires at the root URL with a param.
+
+static XSS_PROBES: &[&str] = &[
+    "<script>alert('VH')</script>",
+    "<img src=x onerror=alert('VH')>",
+    "'><script>alert('VH')</script>",
+    "<svg onload=alert('VH')>",
+    "javascript:alert('VH')",
+    "%3Cscript%3Ealert('VH')%3C/script%3E",
+    "<ScRiPt>alert('VH')</ScRiPt>",
+];
+
+async fn check_xss_reflection(client: &Client, url: &str, tout: Duration) -> Vec<Finding> {
+    // Build a set of test URLs: replace each existing param value, plus add ?q=
+    let mut test_cases: Vec<String> = Vec::new();
+
+    if url.contains('=') {
+        // Replace every param value
+        if let Some(q_pos) = url.find('?') {
+            let base = &url[..q_pos];
+            let query = &url[q_pos + 1..];
+            for probe in XSS_PROBES {
+                let encoded = urlencoding::encode(probe);
+                // Naively replace all values after '=' — good enough for reflection check
+                let new_query: String = query
+                    .split('&')
+                    .map(|kv| {
+                        if let Some(k) = kv.split('=').next() {
+                            format!("{}={}", k, encoded)
+                        } else {
+                            kv.to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("&");
+                test_cases.push(format!("{}?{}", base, new_query));
+            }
+        }
+    } else {
+        // No params — append ?q=<probe>
+        for probe in XSS_PROBES {
+            let encoded = urlencoding::encode(probe);
+            test_cases.push(format!("{}?q={}", url.trim_end_matches('/'), encoded));
+        }
+    }
+
+    for test_url in &test_cases {
+        let resp = match client.get(test_url).timeout(tout).send().await {
+            Ok(r) => r,
+            Err(_) => continue,
+        };
+        let ct = resp
+            .headers()
+            .get("content-type")
+            .and_then(|v| v.to_str().ok())
+            .unwrap_or("")
+            .to_string();
+        // Only flag reflected XSS in HTML responses
+        if !ct.contains("text/html") {
+            continue;
+        }
+        let body = match resp.text().await {
+            Ok(b) => b,
+            Err(_) => continue,
+        };
+        // Check which probe was used for this URL
+        for probe in XSS_PROBES {
+            if body.contains(*probe) {
+                return vec![finding(
+                    OwaspCategory::BrokenAccessControl,
+                    Severity::High,
+                    "[XSS] Reflected Cross-Site Scripting",
+                    &format!(
+                        "The endpoint `{}` reflects the XSS payload `{}` unencoded in \
+                         the HTML response, confirming a Reflected XSS vulnerability. \
+                         An attacker can craft a link that executes arbitrary JavaScript \
+                         in the victim's browser.",
+                        url, probe
+                    ),
+                    &format!("Test URL: {}\nPayload reflected: {}", test_url, probe),
+                    "HTML-encode all user-supplied output. Implement a strict \
+                     Content-Security-Policy. Use a framework that auto-escapes output.",
+                    url,
+                )];
+            }
+        }
+    }
+    vec![]
+}
+
+// ── SQLi Error Detection ─────────────────────────────────────────────────────
+//
+// Injects SQL payloads into every query param (GET) and into common POST body
+// fields (email/username/password) for login-like endpoints.  Detects both
+// error-based and a simple auth-bypass boolean check.
+
+static SQLI_QUICK: &[&str] = &[
+    "'",
+    "''",
+    "' OR '1'='1",
+    "' OR 1=1--",
+    "admin'--",
+    "' UNION SELECT NULL--",
+    "1; SELECT SLEEP(0)--",
+];
+
+static SQL_ERRORS: &[&str] = &[
+    "You have an error in your SQL syntax",
+    "Warning: mysql_",
+    "ORA-0",
+    "Microsoft OLE DB Provider for SQL Server",
+    "Unclosed quotation mark",
+    "SQLSTATE",
+    "pg_query()",
+    "syntax error at or near",
+    "SQLite",
+    "Incorrect syntax near",
+    "mysql_fetch",
+    "sql syntax",
+    "JDBC",
+    "[SQL Server]",
+    "unrecognized token:",
+];
+
+async fn check_sqli_errors(client: &Client, url: &str, tout: Duration) -> Vec<Finding> {
+    let mut test_urls: Vec<String> = Vec::new();
+
+    if url.contains('=') {
+        if let Some(q_pos) = url.find('?') {
+            let base = &url[..q_pos];
+            let query = &url[q_pos + 1..];
+            for probe in SQLI_QUICK {
+                let encoded = urlencoding::encode(probe);
+                let new_query: String = query
+                    .split('&')
+                    .map(|kv| {
+                        if let Some(k) = kv.split('=').next() {
+                            format!("{}={}", k, encoded)
+                        } else {
+                            kv.to_string()
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join("&");
+                test_urls.push(format!("{}?{}", base, new_query));
+            }
+        }
+    } else {
+        for probe in SQLI_QUICK {
+            let encoded = urlencoding::encode(probe);
+            test_urls.push(format!("{}?id={}", url.trim_end_matches('/'), encoded));
+        }
+    }
+
+    // GET-based checks
+    for test_url in &test_urls {
+        if let Ok(resp) = client.get(test_url).timeout(tout).send().await {
+            if let Ok(body) = resp.text().await {
+                if let Some(err) = SQL_ERRORS.iter().find(|&&e| body.contains(e)) {
+                    return vec![finding(
+                        OwaspCategory::BrokenAccessControl,
+                        Severity::Critical,
+                        "[SQLi] SQL Injection — Error-Based (GET)",
+                        &format!(
+                            "The endpoint `{}` leaks a SQL error in the GET response, \
+                             confirming SQL injection. The database error '{}' was triggered.",
+                            url, err
+                        ),
+                        &format!("Test URL: {}\nSQL error: {}", test_url, err),
+                        "Use parameterised queries (prepared statements). Never concatenate \
+                         user input into SQL strings.",
+                        url,
+                    )];
+                }
+            }
+        }
+    }
+
+    // POST body checks for login-like endpoints
+    let url_lc = url.to_lowercase();
+    let is_login = ["login", "signin", "auth", "session", "user"]
+        .iter()
+        .any(|kw| url_lc.contains(kw));
+
+    if is_login {
+        // First get a baseline status with dummy creds
+        let baseline = {
+            client
+                .post(url)
+                .header("Content-Type", "application/json")
+                .body(r#"{"email":"notreal@valinhall.invalid","password":"Dummy!123"}"#)
+                .timeout(tout)
+                .send()
+                .await
+                .map(|r| r.status().as_u16())
+                .unwrap_or(0)
+        };
+
+        if baseline != 0 && baseline != 404 && baseline != 405 {
+            for (email_probe, pass_probe) in &[
+                ("' OR '1'='1'--", "x"),
+                ("' OR 1=1--",     "x"),
+                ("admin'--",        "x"),
+                ("' OR 'x'='x",    "x"),
+            ] {
+                let json = format!(
+                    "{{\"email\":\"{}\",\"password\":\"{}\"}}",
+                    email_probe, pass_probe
+                );
+                let resp = match client
+                    .post(url)
+                    .header("Content-Type", "application/json")
+                    .body(json)
+                    .timeout(tout)
+                    .send()
+                    .await
+                {
+                    Ok(r) => r,
+                    Err(_) => continue,
+                };
+                let inject_status = resp.status().as_u16();
+                let body = resp.text().await.unwrap_or_default();
+
+                // Error-based
+                if let Some(err) = SQL_ERRORS.iter().find(|&&e| body.contains(e)) {
+                    return vec![finding(
+                        OwaspCategory::BrokenAccessControl,
+                        Severity::Critical,
+                        "[SQLi] SQL Injection — Error-Based (POST Login)",
+                        &format!(
+                            "The login endpoint `{}` leaks a SQL error when a crafted \
+                             payload is sent in the JSON body. Error: '{}'.",
+                            url, err
+                        ),
+                        &format!("POST {}\nPayload email: {}\nSQL error: {}", url, email_probe, err),
+                        "Use parameterised queries. Never concatenate POST body fields into SQL.",
+                        url,
+                    )];
+                }
+
+                // Boolean-blind auth bypass: true payload → 2xx, baseline → 4xx
+                if inject_status < 400
+                    && (baseline == 401 || baseline == 403 || baseline == 422)
+                {
+                    // Verify false condition still fails
+                    let false_body = r#"{"email":"' AND '1'='2'--","password":"x"}"#;
+                    let false_status = client
+                        .post(url)
+                        .header("Content-Type", "application/json")
+                        .body(false_body)
+                        .timeout(tout)
+                        .send()
+                        .await
+                        .map(|r| r.status().as_u16())
+                        .unwrap_or(0);
+
+                    if false_status >= 400 {
+                        return vec![finding(
+                            OwaspCategory::BrokenAccessControl,
+                            Severity::Critical,
+                            "[SQLi] SQL Injection — Boolean-Blind Auth Bypass (POST Login)",
+                            &format!(
+                                "The login endpoint `{}` is vulnerable to SQL injection. \
+                                 The true-condition payload `{}` returns HTTP {} (auth succeeds), \
+                                 while the false-condition payload returns HTTP {} (auth fails). \
+                                 This confirms boolean-blind SQLi allowing full authentication bypass.",
+                                url, email_probe, inject_status, false_status
+                            ),
+                            &format!(
+                                "POST {}\nTrue payload: {} → HTTP {}\nFalse payload → HTTP {}",
+                                url, email_probe, inject_status, false_status
+                            ),
+                            "Use parameterised queries (prepared statements). Never build \
+                             SQL from login form input.",
+                            url,
+                        )];
+                    }
+                }
+            }
+        }
+    }
+
     vec![]
 }
 

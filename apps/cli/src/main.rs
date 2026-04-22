@@ -138,6 +138,12 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // ── Load .env from CWD or any parent directory ────────────────────────────
+    // Walks up from the current working directory so the key is found whether
+    // the user runs `valinhall` from `apps/cli/`, the project root, or anywhere
+    // else in the repository tree.
+    load_dotenv_from_ancestors();
+
     let cli = Cli::parse();
 
     // Initialize tracing
@@ -202,6 +208,33 @@ async fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+/// Walk from the current working directory up to the filesystem root looking
+/// for a `.env` file and load the first one found.  This means the key works
+/// whether the user runs `valinhall` from `apps/cli/`, the project root, or
+/// anywhere else in the repository tree.  Already-set env vars are NOT
+/// overridden (dotenvy's default `from_path` behaviour).
+fn load_dotenv_from_ancestors() {
+    let mut dir = std::env::current_dir().unwrap_or_default();
+    loop {
+        let candidate = dir.join(".env");
+        if candidate.exists() {
+            // `from_path` silently skips keys that are already in the env.
+            if let Err(e) = dotenvy::from_path(&candidate) {
+                // Only warn — never abort startup because of a missing/malformed .env
+                eprintln!("warning: failed to load {:?}: {}", candidate, e);
+            } else {
+                // Let the user know which .env was loaded (visible at -v or higher)
+                tracing::debug!("Loaded env from {:?}", candidate);
+            }
+            return; // stop at the first .env found
+        }
+        // Go up one level; break if we've reached the root
+        if !dir.pop() {
+            break;
+        }
+    }
 }
 
 /// Resolve an output path argument into a concrete file path.
