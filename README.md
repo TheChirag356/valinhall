@@ -47,11 +47,11 @@ valinhall/
 
 ## Prerequisites
 
-| Tool | Version | Notes |
-|---|---|---|
-| [Rust](https://rustup.rs/) | stable | MSVC toolchain required on Windows |
-| [Node.js](https://nodejs.org/) | ≥ 20.0 | |
-| [pnpm](https://pnpm.io/) | ≥ 9.0 | `npm i -g pnpm` |
+| Tool                           | Version | Notes                              |
+| ------------------------------ | ------- | ---------------------------------- |
+| [Rust](https://rustup.rs/)     | stable  | MSVC toolchain required on Windows |
+| [Node.js](https://nodejs.org/) | ≥ 20.0  |                                    |
+| [pnpm](https://pnpm.io/)       | ≥ 9.0   | `npm i -g pnpm`                    |
 
 ---
 
@@ -105,16 +105,16 @@ Runs a full security scan. Automatically selects SAST, DAST, or both depending o
 valinhall scan --target <TARGET> [OPTIONS]
 ```
 
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `-t, --target` | string | **required** | URL (`https://…`) or local directory path |
-| `-o, --output` | string | current dir | Output path for JSON results. Can be a file or directory. |
-| `--report` | bool | `true` | Generate an HTML report alongside the JSON output |
-| `--sast-only` | flag | false | Run only static analysis — skip DAST (network attacks) |
-| `--dast-only` | flag | false | Run only dynamic analysis — skip SAST |
-| `--llm` | flag | false | Include LLM red-team probes |
-| `--concurrency` | number | `20` | Max concurrent HTTP requests (DAST only) |
-| `--timeout` | number | `10` | Request timeout in seconds (DAST only) |
+| Flag            | Type   | Default      | Description                                               |
+| --------------- | ------ | ------------ | --------------------------------------------------------- |
+| `-t, --target`  | string | **required** | URL (`https://…`) or local directory path                 |
+| `-o, --output`  | string | current dir  | Output path for JSON results. Can be a file or directory. |
+| `--report`      | bool   | `true`       | Generate an HTML report alongside the JSON output         |
+| `--sast-only`   | flag   | false        | Run only static analysis — skip DAST (network attacks)    |
+| `--dast-only`   | flag   | false        | Run only dynamic analysis — skip SAST                     |
+| `--llm`         | flag   | false        | Include LLM red-team probes                               |
+| `--concurrency` | number | `20`         | Max concurrent HTTP requests (DAST only)                  |
+| `--timeout`     | number | `10`         | Request timeout in seconds (DAST only)                    |
 
 **Examples:**
 
@@ -154,11 +154,11 @@ Audits project dependencies against the [OSV.dev](https://osv.dev) vulnerability
 valinhall audit [OPTIONS]
 ```
 
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `-p, --path` | string | `.` (current dir) | Root of the project to audit |
-| `--ecosystems` | string | `node,rust,go` | Comma-separated list of ecosystems to check |
-| `--fail-on-vuln` | flag | false | Exit with code `1` if any vulnerabilities are found (useful in CI) |
+| Flag             | Type   | Default           | Description                                                        |
+| ---------------- | ------ | ----------------- | ------------------------------------------------------------------ |
+| `-p, --path`     | string | `.` (current dir) | Root of the project to audit                                       |
+| `--ecosystems`   | string | `node,rust,go`    | Comma-separated list of ecosystems to check                        |
+| `--fail-on-vuln` | flag   | false             | Exit with code `1` if any vulnerabilities are found (useful in CI) |
 
 **Examples:**
 
@@ -189,10 +189,10 @@ Converts a previously saved JSON scan result into a self-contained HTML report.
 valinhall report --input <JSON_FILE> [--output <HTML_FILE>]
 ```
 
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `-i, --input` | string | **required** | Path to a `scan-result-*.json` file |
-| `-o, --output` | string | auto-generated | Output HTML file path |
+| Flag           | Type   | Default        | Description                         |
+| -------------- | ------ | -------------- | ----------------------------------- |
+| `-i, --input`  | string | **required**   | Path to a `scan-result-*.json` file |
+| `-o, --output` | string | auto-generated | Output HTML file path               |
 
 **Examples:**
 
@@ -214,10 +214,10 @@ Starts an embedded HTTP server that the SvelteKit dashboard connects to for real
 valinhall serve [OPTIONS]
 ```
 
-| Flag | Type | Default | Description |
-|---|---|---|---|
-| `-p, --port` | number | `7474` | Port to listen on |
-| `-t, --target` | string | none | Immediately start a scan against this target on server start |
+| Flag           | Type   | Default | Description                                                  |
+| -------------- | ------ | ------- | ------------------------------------------------------------ |
+| `-p, --port`   | number | `7474`  | Port to listen on                                            |
+| `-t, --target` | string | none    | Immediately start a scan against this target on server start |
 
 **Examples:**
 
@@ -299,9 +299,9 @@ valinhall scan --target . --sast-only --output ci-results.json
 
 Every `scan` run produces two files in the output directory (current directory by default):
 
-| File | Description |
-|---|---|
-| `scan-result-<YYYYMMDD-HHmmss>.json` | Machine-readable findings in JSON format |
+| File                                      | Description                                                                          |
+| ----------------------------------------- | ------------------------------------------------------------------------------------ |
+| `scan-result-<YYYYMMDD-HHmmss>.json`      | Machine-readable findings in JSON format                                             |
 | `valinhall-report-<YYYYMMDD-HHmmss>.html` | Self-contained HTML report (generated when `--report` is true, which is the default) |
 
 Pass `--output <dir>` to redirect both files to a specific directory, or `--output <file>.json` to write to an exact path.
@@ -316,21 +316,110 @@ valinhall scan --target ./src --sast-only --output ./ci/scan-output.json
 
 ---
 
+## 🛠️ Engines & Functionality
+
+Valinhall is composed of specialized scanning engines that each target specific vulnerability vectors. 
+
+### 1. DAST (Dynamic Application Security Testing)
+Orchestrates dynamic testing against live applications. It runs concurrent probes checking for:
+- **Injection:** SQLi, XSS, Command Injection
+- **Auth Probes:** Broken authentication testing
+- **Exception Handling:** Detecting stack trace leaks and unhandled 500 errors.
+- **Security Headers:** Missing HSTS, CSP, X-Frame-Options, etc.
+
+### 2. SAST (Static Application Security Testing)
+Analyzes local source code for vulnerabilities and misconfigurations.
+- Parses code structure using AST or Regex.
+- Detects Hardcoded Secrets, Insecure Configurations, and Code-Level Bugs (e.g., ReDoS).
+- **Usage:** Provide a local directory as `--target` instead of a URL.
+
+### 3. Endpoint Crawler (Blackbox Recon)
+Triggered by the `--blackbox` flag. It performs deep reconnaissance to find all attack surfaces.
+- **Web Crawling:** Recursively parses links from HTML.
+- **JS Mining:** Extracts API endpoints and hidden routes from JavaScript bundles.
+- **Wordlist Fuzzing:** Brute-forces common administrative and backup paths.
+
+### 4. Vulnerability Tester (`vuln_tester`)
+The workhorse engine that tests every discovered endpoint from the Crawler for:
+- **CORS Misconfigurations** (Wildcard origin + credentials)
+- **Sensitive File Exposure** (`.env`, `.git`, backups)
+- **HTTP Method Enumeration** (Testing TRACE, PUT, DELETE)
+- **Open Redirects**
+- **Path Traversal** (`/../../etc/passwd`)
+- **SSRF** (Querying cloud metadata `169.254.169.254`)
+- **IDOR / Auth Bypass**
+
+### 5. GraphQL Introspection & Fuzzer (`graphql_fuzzer`)
+Automatically probes endpoints to detect GraphQL interfaces.
+- **Introspection Exposure:** Attempts to query `__schema` to dump the entire database structure.
+- **Circular Queries (DoS):** Sends mutually recursive fragments to test for query parser crashes.
+- **Deep Nesting (DoS):** Sends highly nested alias queries (>15 levels deep) to verify Query Depth Limiting.
+
+### 6. OpenAPI / Swagger Fuzzer (`openapi_fuzzer`)
+Triggered via `--openapi`. It hunts for exposed API specs (like `/openapi.json`).
+- **Spec Parsing:** Reads the OpenAPI definition.
+- **Unauthenticated Access:** Flags endpoints returning 200/201 without authorization headers.
+- **Type Confusion:** Sends incorrect data types (string for int) to trigger 500 errors.
+- **Injection:** Fuzzes every string parameter with SQLi and XSS payloads.
+- **Missing Required Fields:** Tests robustness of the API against malformed bodies.
+
+### 7. XXE Scanner (`xxe_scanner`)
+Included automatically with `--blackbox`. Probes endpoints accepting XML for XML External Entity injection.
+- **File Read:** Tries to extract `/etc/passwd`.
+- **SSRF via XXE:** Tests resolving internal AWS Metadata endpoints.
+- **Parameter Entity & OOB Blind XXE:** Checks for blind parsers using external DTD subsets.
+
+### 8. OSV Blackbox (`osv_blackbox`)
+Triggered via `--osv-blackbox`.
+- **Server Fingerprinting:** Inspects `Server`, `X-Powered-By`, and cache headers.
+- **CVE Mapping:** Normalizes fingerprints (e.g., `nginx/1.18.0`) and queries the OSV.dev API to surface associated known vulnerabilities (CVEs) and their fix versions.
+
+### 9. K-Means Anomaly Detection (`anomaly`)
+Triggered via `--anomaly`. Uses unsupervised Machine Learning to find hidden logic flaws.
+- **Feature Extraction:** Probes 50+ common seed paths, measuring HTTP Status, Body Length, Header Count, and Response Time.
+- **Clustering:** Normalizes the data and clusters using the K-Means algorithm.
+- **Outlier Detection:** Flags singleton clusters or responses whose distance to the centroid exceeds a Z-score threshold (configurable). Identifies unusual endpoints that standard signatures miss.
+
+### 10. Nuclei Template Runner (`nuclei`)
+Triggered via `--nuclei`. Executes ProjectDiscovery Nuclei YAML templates natively within Valinhall.
+- Lazily loads templates based on `tags`.
+- Executes HTTP requests, processes `matchers` (regex, words, status), and parses `extractors`.
+- **Setup:** Run `git clone https://github.com/projectdiscovery/nuclei-templates ~/.valinhall/nuclei-templates`.
+
+### 11. LLM WAF Mutator (`waf_mutator`)
+Triggered via `--waf-mutator`. (Requires `OPENROUTER_API_KEY`).
+- When a payload is blocked by a Web Application Firewall (403/406), this engine kicks in.
+- It sends the blocked payload, injection point, and server response to an LLM via OpenRouter.
+- The LLM suggests bypass mutations (e.g., encoding, alternate tags, comment insertion).
+- Valinhall **automatically retries** the mutations. If a 200 is returned, a "WAF Bypass Confirmed" finding is generated.
+
+### 12. TCP Port Scanner (`port_scanner`)
+Triggered via `--port-scan`.
+- Conducts rapid concurrent TCP scanning for ports 1–10000 + hidden high ports.
+- Automatically performs basic Banner Grabbing on open ports to identify underlying services.
+
+### 13. Supply Chain Audit (`supply`)
+Triggered via `valinhall audit`.
+- Analyzes `package.json`, `Cargo.toml`, `go.mod`, etc., in a local directory.
+- Queries OSV.dev to find known vulnerabilities in the project's dependency tree.
+
+---
+
 ## OWASP 2026 Coverage
 
-| # | Category | Engine / Probe |
-|---|---|---|
-| A01 | Broken Access Control | `probes/auth` |
-| A02 | Cryptographic Failures | `engine/sast` |
-| A03 | Software Supply Chain Failures | `engine/supply` |
-| A04 | Insecure Design | `probes/auth` |
-| A05 | Security Misconfiguration | `engine/dast` |
-| A06 | Vulnerable Components | `engine/supply` |
-| A07 | Identification & Auth Failures | `probes/auth` |
-| A08 | Software & Data Integrity Failures | `probes/injection` |
-| A09 | Security Logging Failures | `probes/exceptions` |
+| #   | Category                           | Engine / Probe      |
+| --- | ---------------------------------- | ------------------- |
+| A01 | Broken Access Control              | `probes/auth`       |
+| A02 | Cryptographic Failures             | `engine/sast`       |
+| A03 | Software Supply Chain Failures     | `engine/supply`     |
+| A04 | Insecure Design                    | `probes/auth`       |
+| A05 | Security Misconfiguration          | `engine/dast`       |
+| A06 | Vulnerable Components              | `engine/supply`     |
+| A07 | Identification & Auth Failures     | `probes/auth`       |
+| A08 | Software & Data Integrity Failures | `probes/injection`  |
+| A09 | Security Logging Failures          | `probes/exceptions` |
 | A10 | Mishandling Exceptional Conditions | `probes/exceptions` |
-| LLM | AI/LLM Red-Teaming | `probes/llm` |
+| LLM | AI/LLM Red-Teaming                 | `probes/llm`        |
 
 ---
 
@@ -338,28 +427,28 @@ valinhall scan --target ./src --sast-only --output ./ci/scan-output.json
 
 These rules are applied during every local codebase scan:
 
-| Rule | Severity | Languages | Description |
-|---|---|---|---|
-| Hardcoded Secret (Generic) | 🔴 Critical | All | API keys, tokens, passwords assigned as string literals |
-| Hardcoded AWS Key | 🔴 Critical | All | AWS Access Key ID pattern (`AKIA…`) |
-| Hardcoded Private Key | 🔴 Critical | All | `BEGIN PRIVATE KEY` blocks in source |
-| JWT Secret Hardcoded | 🔴 Critical | All | Hardcoded JWT signing secrets |
-| SQL Injection Sink | 🟠 High | All | String-concatenated SQL queries |
-| eval() Usage | 🟠 High | JS/TS/Python | Dynamic code execution via `eval()` |
-| subprocess shell=True | 🟠 High | Python | Shell injection risk in subprocess calls |
-| Disabled TLS Verification | 🟠 High | All | `verify=False`, `rejectUnauthorized: false` |
-| Path Traversal Sink | 🟠 High | RS/JS/PY | User input in file path construction |
-| Pickle Deserialization | 🟠 High | Python | `pickle.load()` on untrusted data |
-| innerHTML Assignment | 🟡 Medium | JS/TS | XSS risk via unescaped HTML assignment |
-| Insecure Random | 🟡 Medium | JS/TS | `Math.random()` for security-sensitive values |
-| MD5 / SHA1 Usage | 🟡 Medium | All | Broken cryptographic hash functions |
-| CORS Allow All Origins | 🟡 Medium | All | Wildcard `Access-Control-Allow-Origin: *` |
-| XML External Entity Risk | 🟡 Medium | All | XML parsers without explicit XXE protection |
-| Debug Mode Enabled | 🟡 Medium | Py/JS | `DEBUG=True` / `debug: true` in production configs |
-| Potential ReDoS | 🟡 Medium | All | Nested regex quantifiers `(a+)+` inside patterns |
-| Unsafe Rust Block | 🔵 Low | Rust | `unsafe {}` blocks — flagged for review |
-| Hardcoded IP Address | ⚪ Info | All | Hardcoded infrastructure IP references |
-| TODO/FIXME Security Comment | ⚪ Info | All | Unresolved security `TODO` or `FIXME` notes |
+| Rule                        | Severity    | Languages    | Description                                             |
+| --------------------------- | ----------- | ------------ | ------------------------------------------------------- |
+| Hardcoded Secret (Generic)  | 🔴 Critical | All          | API keys, tokens, passwords assigned as string literals |
+| Hardcoded AWS Key           | 🔴 Critical | All          | AWS Access Key ID pattern (`AKIA…`)                     |
+| Hardcoded Private Key       | 🔴 Critical | All          | `BEGIN PRIVATE KEY` blocks in source                    |
+| JWT Secret Hardcoded        | 🔴 Critical | All          | Hardcoded JWT signing secrets                           |
+| SQL Injection Sink          | 🟠 High     | All          | String-concatenated SQL queries                         |
+| eval() Usage                | 🟠 High     | JS/TS/Python | Dynamic code execution via `eval()`                     |
+| subprocess shell=True       | 🟠 High     | Python       | Shell injection risk in subprocess calls                |
+| Disabled TLS Verification   | 🟠 High     | All          | `verify=False`, `rejectUnauthorized: false`             |
+| Path Traversal Sink         | 🟠 High     | RS/JS/PY     | User input in file path construction                    |
+| Pickle Deserialization      | 🟠 High     | Python       | `pickle.load()` on untrusted data                       |
+| innerHTML Assignment        | 🟡 Medium   | JS/TS        | XSS risk via unescaped HTML assignment                  |
+| Insecure Random             | 🟡 Medium   | JS/TS        | `Math.random()` for security-sensitive values           |
+| MD5 / SHA1 Usage            | 🟡 Medium   | All          | Broken cryptographic hash functions                     |
+| CORS Allow All Origins      | 🟡 Medium   | All          | Wildcard `Access-Control-Allow-Origin: *`               |
+| XML External Entity Risk    | 🟡 Medium   | All          | XML parsers without explicit XXE protection             |
+| Debug Mode Enabled          | 🟡 Medium   | Py/JS        | `DEBUG=True` / `debug: true` in production configs      |
+| Potential ReDoS             | 🟡 Medium   | All          | Nested regex quantifiers `(a+)+` inside patterns        |
+| Unsafe Rust Block           | 🔵 Low      | Rust         | `unsafe {}` blocks — flagged for review                 |
+| Hardcoded IP Address        | ⚪ Info     | All          | Hardcoded infrastructure IP references                  |
+| TODO/FIXME Security Comment | ⚪ Info     | All          | Unresolved security `TODO` or `FIXME` notes             |
 
 ---
 
