@@ -7,7 +7,7 @@
 
 use anyhow::Result;
 use axum::{
-    extract::State,
+    extract::{State, ws::{WebSocketUpgrade, WebSocket, Message}},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response, Sse},
     routing::get,
@@ -18,6 +18,7 @@ use std::{convert::Infallible, sync::Arc, time::Duration};
 use tokio::sync::RwLock;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
+use colored::Colorize;
 
 use crate::models::ScanResult;
 
@@ -25,6 +26,8 @@ use crate::models::ScanResult;
 struct AppState {
     result: Arc<RwLock<Option<ScanResult>>>,
     status: Arc<RwLock<ServerStatus>>,
+    /// Optional user-supplied task instructions forwarded to the agent.
+    instructions: Arc<String>,
 }
 
 #[derive(Clone, serde::Serialize)]
@@ -34,7 +37,13 @@ pub struct ServerStatus {
     pub target: Option<String>,
 }
 
-pub async fn start(port: u16, target: Option<String>) -> Result<()> {
+/// Start the embedded HTTP + WebSocket server.
+///
+/// * `port`         — TCP port to listen on.
+/// * `target`       — If `Some`, begin a DAST scan immediately.
+/// * `instructions` — Optional natural-language task description forwarded to the
+///                    browser-extension agent (from `--explain`).
+pub async fn start(port: u16, target: Option<String>, instructions: String) -> Result<()> {
     let state = AppState {
         result: Arc::new(RwLock::new(None)),
         status: Arc::new(RwLock::new(ServerStatus {
@@ -42,6 +51,7 @@ pub async fn start(port: u16, target: Option<String>) -> Result<()> {
             progress: 0,
             target: target.clone(),
         })),
+        instructions: Arc::new(instructions),
     };
 
     if let Some(t) = target.clone() {
@@ -114,6 +124,7 @@ pub async fn start(port: u16, target: Option<String>) -> Result<()> {
         .route("/api/status", get(get_status))
         .route("/api/results", get(get_results))
         .route("/api/events", get(sse_handler))
+        .route("/extension", get(ws_extension_handler))
         .route("/health", get(|| async { "OK" }))
         .layer(cors)
         .with_state(state.clone());
@@ -163,4 +174,191 @@ async fn sse_handler(
             .interval(Duration::from_secs(15))
             .text("ping"),
     )
+}
+
+async fn ws_extension_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
+    let instructions = Arc::clone(&state.instructions);
+    ws.on_upgrade(move |socket| handle_socket(socket, instructions))
+}
+
+/// Handle a connected browser-extension WebSocket.
+///
+/// ## Protocol
+///
+/// **CLI → Extension messages:**
+/// - `LLM_REQUEST`    — ask the extension to gather DOM context.
+/// - `EXECUTE_BATCH`  — a list of actions for the extension to run in order.
+///
+/// **Extension → CLI messages:**
+/// - `EXTENSION_READY`  — extension just connected.
+/// - `CONTEXT_GATHERED` — DOM context (triggers first LLM call).
+/// - `BATCH_RESULT`     — results of a previously dispatched batch (triggers next LLM call).
+///
+/// The key improvement over the old protocol is that the LLM now returns an **array** of
+/// actions per call, which are all dispatched to the extension in a single `EXECUTE_BATCH`
+/// message.  The extension executes them in sequence and sends back one `BATCH_RESULT`.
+/// This way we use O(phases) LLM calls instead of O(actions) calls.
+async fn handle_socket(mut socket: WebSocket, instructions: Arc<String>) {
+    tracing::info!("Browser extension connected via WebSocket");
+
+    let instructions_ref: Option<&str> = if instructions.trim().is_empty() {
+        None
+    } else {
+        Some(instructions.as_str())
+    };
+
+    let mut agent = match crate::engine::ext_agent::ExtAgent::new(instructions_ref) {
+        Ok(a) => a,
+        Err(e) => {
+            tracing::error!("Failed to initialize ExtAgent: {}. Disconnecting.", e);
+            return;
+        }
+    };
+
+    while let Some(msg) = socket.recv().await {
+        let msg = match msg {
+            Ok(m) => m,
+            Err(_) => {
+                tracing::warn!("Extension connection abruptly disconnected");
+                break;
+            }
+        };
+
+        match msg {
+            Message::Text(t) => {
+                tracing::info!("Received from extension: {}", t);
+
+                let json_msg = match serde_json::from_str::<serde_json::Value>(&t) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        tracing::warn!("Could not parse message as JSON: {}", e);
+                        continue;
+                    }
+                };
+
+                let msg_type = json_msg
+                    .get("type")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("");
+
+                // ── EXTENSION_READY: ask for initial DOM snapshot ──────────────
+                if msg_type == "EXTENSION_READY" {
+                    println!("{} Extension connected. Requesting initial DOM context...", "🔌".blue());
+                    let cmd = serde_json::json!({
+                        "type": "LLM_REQUEST",
+                        "taskId": uuid::Uuid::new_v4().to_string()
+                    });
+                    if let Err(e) = socket.send(Message::Text(cmd.to_string().into())).await {
+                        tracing::error!("Failed to request context: {}", e);
+                    }
+                    continue;
+                }
+
+                // ── Build the prompt depending on message type ─────────────────
+                let prompt = if msg_type == "CONTEXT_GATHERED" {
+                    let context = json_msg
+                        .get("context")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!({}));
+                    println!(
+                        "{} Received DOM context from browser. Agent is analyzing...",
+                        "👁️".green()
+                    );
+                    format!(
+                        "Current page context:\n{}",
+                        serde_json::to_string_pretty(&context).unwrap_or_default()
+                    )
+                } else if msg_type == "BATCH_RESULT" {
+                    let results = json_msg
+                        .get("results")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!([]));
+                    println!(
+                        "{} Batch complete. {} action(s) executed. Agent is planning next steps...",
+                        "✅".green(),
+                        results
+                            .as_array()
+                            .map(|a| a.len())
+                            .unwrap_or(0)
+                    );
+                    format!(
+                        "Batch results:\n{}",
+                        serde_json::to_string_pretty(&results).unwrap_or_default()
+                    )
+                } else {
+                    // Unknown message type — skip
+                    continue;
+                };
+
+                // ── Ask the LLM for a batch of actions ────────────────────────
+                tracing::info!("Asking LLM for next action batch...");
+                match agent.get_next_actions(prompt).await {
+                    Ok(actions) => {
+                        let done = actions.iter().any(|a| {
+                            a.get("action").and_then(|v| v.as_str()) == Some("DONE")
+                        });
+
+                        // Log the planned batch
+                        println!(
+                            "{} Agent planned {} action(s):",
+                            "⚡".yellow(),
+                            actions.len()
+                        );
+                        for (i, a) in actions.iter().enumerate() {
+                            let name = a
+                                .get("action")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("?");
+                            let payload = a
+                                .get("payload")
+                                .map(|p| serde_json::to_string(p).unwrap_or_default())
+                                .unwrap_or_default();
+                            println!("   {}. {} → {}", i + 1, name.cyan(), payload.dimmed());
+                        }
+
+                        // Send the whole batch to the extension in one message
+                        let batch_cmd = serde_json::json!({
+                            "type": "EXECUTE_BATCH",
+                            "taskId": uuid::Uuid::new_v4().to_string(),
+                            "actions": actions
+                        });
+                        if let Err(e) = socket
+                            .send(Message::Text(batch_cmd.to_string().into()))
+                            .await
+                        {
+                            tracing::error!("Failed to send batch to extension: {}", e);
+                        }
+
+                        if done {
+                            // Find the DONE action's summary if present
+                            let summary = actions
+                                .iter()
+                                .find(|a| {
+                                    a.get("action").and_then(|v| v.as_str()) == Some("DONE")
+                                })
+                                .and_then(|a| a.get("payload"))
+                                .and_then(|p| p.get("summary"))
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("(no summary provided)");
+                            println!(
+                                "\n{} Agent finished. Summary:\n  {}",
+                                "🏁".blue(),
+                                summary
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to get next action batch from LLM: {}", e);
+                    }
+                }
+            }
+
+            Message::Close(c) => {
+                tracing::info!("Extension disconnected: {:?}", c);
+                break;
+            }
+
+            _ => {}
+        }
+    }
 }

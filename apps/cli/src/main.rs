@@ -138,6 +138,25 @@ enum Commands {
         #[arg(short, long)]
         target: Option<String>,
     },
+
+    /// Launch Chromium with the Valinhall testing extension loaded
+    ExtTest {
+        /// Target URL to test with the extension
+        #[arg(short, long)]
+        target: String,
+
+        /// Extension directory path (default: apps/extension)
+        #[arg(short, long, default_value = "apps/extension")]
+        ext_dir: String,
+        
+        /// Websocket server port
+        #[arg(short, long, default_value = "7474")]
+        port: u16,
+
+        /// Natural-language instructions for the agent (e.g. "try prompt injection on every level")
+        #[arg(long, default_value = "")]
+        explain: String,
+    },
 }
 
 #[tokio::main]
@@ -208,7 +227,116 @@ async fn main() -> Result<()> {
         }
 
         Commands::Serve { port, target } => {
-            server::start(port, target).await?;
+            tokio::select! {
+                res = server::start(port, target, String::new()) => {
+                    if let Err(e) = res {
+                        tracing::error!("Server ended with error: {}", e);
+                    }
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    println!("\n{} Shutting down server...", "🛑".red());
+                    std::process::exit(0);
+                }
+            }
+        }
+
+        Commands::ExtTest { target, ext_dir, port, explain } => {
+            println!("{} Starting WebSocket server for extension on port {}...", "▶".cyan(), port);
+            if !explain.trim().is_empty() {
+                println!("{} Agent instructions: {}", "📋".cyan(), explain.dimmed());
+            }
+            
+            // Start the server in the background, forwarding user instructions to the agent
+            let server_task = tokio::spawn(async move {
+                server::start(port, None, explain).await
+            });
+            
+            println!("{} Launching Chromium with extension...", "▶".cyan());
+            
+            let ext_path = if std::path::Path::new(&ext_dir).is_absolute() {
+                std::path::PathBuf::from(&ext_dir)
+            } else {
+                let direct_path = std::env::current_dir()?.join(&ext_dir);
+                if direct_path.exists() {
+                    direct_path
+                } else if std::path::Path::new("Cargo.toml").exists() && std::env::current_dir()?.parent().unwrap().join("extension").exists() {
+                    std::env::current_dir()?.parent().unwrap().join("extension")
+                } else {
+                    direct_path
+                }
+            };
+            
+            let ext_path_str = ext_path.to_string_lossy();
+            let temp_dir = std::env::temp_dir().join(format!("valinhall-chrome-{}", uuid::Uuid::new_v4()));
+            let temp_dir_str = temp_dir.to_string_lossy();
+            
+            let mut cmd = std::process::Command::new("chrome"); // fallback name
+            if cfg!(target_os = "windows") {
+                cmd = std::process::Command::new("cmd");
+                cmd.args(["/C", "start", "chrome"]);
+            } else if cfg!(target_os = "macos") {
+                cmd = std::process::Command::new("open");
+                cmd.args(["-a", "Google Chrome", "-n", "--args"]);
+            } else {
+                cmd = std::process::Command::new("google-chrome");
+            }
+            
+            // Adding Chrome flags
+            if cfg!(target_os = "windows") {
+                cmd.args([
+                    &format!("--user-data-dir={}", temp_dir_str),
+                    &format!("--load-extension={}", ext_path_str),
+                    &target
+                ]);
+            } else if cfg!(target_os = "macos") {
+                cmd.args([
+                    &format!("--user-data-dir={}", temp_dir_str),
+                    &format!("--load-extension={}", ext_path_str),
+                    &target
+                ]);
+            } else {
+                cmd.args([
+                    &format!("--user-data-dir={}", temp_dir_str),
+                    &format!("--load-extension={}", ext_path_str),
+                    &target
+                ]);
+            }
+            
+            match cmd.spawn() {
+                Ok(_) => {
+                    println!("{} Browser launched successfully.", "✓".green());
+                    println!("{} Waiting for extension to connect and run tests (Press Ctrl+C to exit)...", "ℹ".blue());
+                }
+                Err(e) => {
+                    println!("{} Failed to launch browser: {}", "✗".red(), e);
+                    println!("Please run Chrome manually with: --load-extension={}", ext_path_str);
+                }
+            }
+            
+            // Keep the process alive for the server, but handle Ctrl+C gracefully
+            tokio::select! {
+                res = server_task => {
+                    match res {
+                        Ok(Err(e)) => {
+                            tracing::error!("Server task ended with error: {}", e);
+                            println!("{} Server failed to start: {}", "✗".red(), e);
+                        }
+                        Err(e) => {
+                            tracing::error!("Server task panicked: {}", e);
+                        }
+                        Ok(Ok(())) => {
+                            tracing::info!("Server shut down cleanly.");
+                        }
+                    }
+                    std::process::exit(1);
+                }
+                _ = tokio::signal::ctrl_c() => {
+                    println!("\n{} Shutting down Valinhall...", "🛑".red());
+                    // Cleanup temporary profile on exit
+                    let _ = std::fs::remove_dir_all(&temp_dir);
+                    std::process::exit(0);
+                }
+            }
         }
     }
 

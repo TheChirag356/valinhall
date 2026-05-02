@@ -10,13 +10,13 @@ use std::sync::Arc;
 
 use anyhow::Result;
 use rand::Rng;
-use reqwest::{Client, Method};
-use serde_json::{json, Value};
+use reqwest::Client;
+use serde_json::json;
 use tokio::sync::Semaphore;
-use tracing::{debug, info, warn};
+use tracing::{debug, info};
 use uuid::Uuid;
 
-use crate::models::{Finding, FindingSource, OwaspCategory, Severity, ScanConfig};
+use crate::models::{Finding, FindingSource, OwaspCategory, ScanConfig, Severity};
 
 // ── Prompt Injection Payloads ─────────────────────────────────────────────────
 
@@ -161,6 +161,7 @@ static LLM_API_PATTERNS: &[&str] = &[
     "api.mistral.ai",
     "azure.openai.com",
     "bedrock.amazonaws.com",
+    "api.groq.com/openai/v1/chat/completions",
 ];
 
 // ── Main Entry ────────────────────────────────────────────────────────────────
@@ -189,48 +190,28 @@ pub async fn run(config: &ScanConfig) -> Result<Vec<Finding>> {
 
     for endpoint in &endpoints {
         // Stage 2: Direct Prompt Injection
-        let dpi_findings = probe_direct_injection(
-            Arc::clone(&client),
-            Arc::clone(&sem),
-            endpoint,
-        )
-        .await?;
+        let dpi_findings =
+            probe_direct_injection(Arc::clone(&client), Arc::clone(&sem), endpoint).await?;
         findings.extend(dpi_findings);
 
         // Stage 3: Agentic Tool Call Exploitation (Invisible Prompting)
-        let agentic_findings = probe_agentic_tools(
-            Arc::clone(&client),
-            Arc::clone(&sem),
-            endpoint,
-        )
-        .await?;
+        let agentic_findings =
+            probe_agentic_tools(Arc::clone(&client), Arc::clone(&sem), endpoint).await?;
         findings.extend(agentic_findings);
 
         // Stage 4: PII Exfiltration
-        let pii_findings = probe_pii_exfiltration(
-            Arc::clone(&client),
-            Arc::clone(&sem),
-            endpoint,
-        )
-        .await?;
+        let pii_findings =
+            probe_pii_exfiltration(Arc::clone(&client), Arc::clone(&sem), endpoint).await?;
         findings.extend(pii_findings);
 
         // Stage 5: Hallucination & Misinformation (Garak)
-        let hallucination_findings = probe_hallucination(
-            Arc::clone(&client),
-            Arc::clone(&sem),
-            endpoint,
-        )
-        .await?;
+        let hallucination_findings =
+            probe_hallucination(Arc::clone(&client), Arc::clone(&sem), endpoint).await?;
         findings.extend(hallucination_findings);
 
         // Stage 6: Output Injection / XSS (Garak)
-        let xss_findings = probe_xss_injection(
-            Arc::clone(&client),
-            Arc::clone(&sem),
-            endpoint,
-        )
-        .await?;
+        let xss_findings =
+            probe_xss_injection(Arc::clone(&client), Arc::clone(&sem), endpoint).await?;
         findings.extend(xss_findings);
     }
 
@@ -415,7 +396,9 @@ async fn probe_pii_exfiltration(
     });
 
     let seed_resp = client.post(endpoint).json(&seed_body).send().await;
-    let Ok(_) = seed_resp else { return Ok(findings) };
+    let Ok(_) = seed_resp else {
+        return Ok(findings);
+    };
 
     // Wait a moment
     tokio::time::sleep(std::time::Duration::from_millis(500)).await;

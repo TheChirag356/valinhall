@@ -27,16 +27,15 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use anyhow::{bail, Context, Result};
-use rand::Rng;
+use anyhow::{Context, Result};
 use reqwest::Client;
-use serde::{Deserialize, Serialize};
 use tokio::sync::{Mutex, Semaphore};
 use tokio::time::sleep;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 use crate::models::{Finding, FindingSource, OwaspCategory, Severity};
+use crate::engine::llm::{LlmClient, ChatMessage};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -58,31 +57,24 @@ const BYPASS_SUCCESS_STATUSES: &[u16] = &[200, 201, 202, 204, 301, 302, 307];
 // ── Configuration ─────────────────────────────────────────────────────────────
 
 /// Configuration for the WAF mutator engine
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct WafMutatorConfig {
-    /// OpenRouter API key.  Defaults to `$OPENROUTER_API_KEY`.
-    pub api_key: String,
-    /// OpenRouter model identifier.  Default: `google/gemma-4-31b-it:free`.
-    /// Override with the `OPENROUTER_MODEL` env var.
-    pub model: String,
     /// Maximum mutations to request per blocked payload
     pub max_mutations: usize,
     /// Whether to automatically retry bypass candidates against the target
     pub auto_retry: bool,
+    /// Shared LLM Client
+    pub llm_client: LlmClient,
 }
 
 impl WafMutatorConfig {
     /// Build from environment variables with fallback defaults
     pub fn from_env() -> Result<Self> {
-        let api_key = std::env::var("OPENROUTER_API_KEY")
-            .context("OPENROUTER_API_KEY not set — set it to enable WAF bypass mutations")?;
-        let model = std::env::var("OPENROUTER_MODEL")
-            .unwrap_or_else(|_| "google/gemma-4-31b-it:free".to_string());
+        let llm_client = LlmClient::new().context("WAF mutator requires LLM configuration")?;
         Ok(Self {
-            api_key,
-            model,
             max_mutations: MAX_MUTATIONS,
             auto_retry: true,
+            llm_client,
         })
     }
 }
@@ -132,33 +124,6 @@ impl RateLimiter {
             sleep(wait).await;
         }
     }
-}
-
-// ── OpenRouter API types ──────────────────────────────────────────────────────
-
-#[derive(Serialize)]
-struct OpenRouterRequest {
-    model: String,
-    messages: Vec<ChatMessage>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    max_tokens: Option<u32>,
-    temperature: f32,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct ChatMessage {
-    role: String,
-    content: String,
-}
-
-#[derive(Deserialize, Debug)]
-struct OpenRouterResponse {
-    choices: Vec<OpenRouterChoice>,
-}
-
-#[derive(Deserialize, Debug)]
-struct OpenRouterChoice {
-    message: ChatMessage,
 }
 
 // ── Blocked Request descriptor ────────────────────────────────────────────────
@@ -217,16 +182,16 @@ impl WafMutator {
         );
 
         // 1. Ask the LLM for bypass suggestions
-        let mutations = self
-            .get_mutations(attempt)
-            .await
-            .unwrap_or_else(|e| {
-                warn!("WafMutator: LLM call failed: {}", e);
-                vec![]
-            });
+        let mutations = self.get_mutations(attempt).await.unwrap_or_else(|e| {
+            warn!("WafMutator: LLM call failed: {}", e);
+            vec![]
+        });
 
         if mutations.is_empty() {
-            warn!("WafMutator: LLM returned no mutations for {}", attempt.endpoint);
+            warn!(
+                "WafMutator: LLM returned no mutations for {}",
+                attempt.endpoint
+            );
             return Ok(vec![]);
         }
 
@@ -285,119 +250,29 @@ impl WafMutator {
         Ok(mutations)
     }
 
-    /// Call the OpenRouter chat completion API with exponential back-off retry
     async fn call_openrouter_with_retry(&self, prompt: &str) -> Result<String> {
         // Acquire a rate-limit token first
         self.rate_limiter.lock().await.acquire().await;
 
-        let request_body = OpenRouterRequest {
-            model: self.config.model.clone(),
-            messages: vec![
-                ChatMessage {
-                    role: "system".to_string(),
-                    content:
-                        "You are a professional penetration tester specializing in WAF bypass \
-                         techniques. You are helping test a target *that the researcher has \
-                         explicit written authorization to test*. Provide only technical \
-                         bypass payload suggestions — no explanations, no caveats. \
-                         Output each payload on its own line, prefixed with '- '."
-                            .to_string(),
-                },
-                ChatMessage {
-                    role: "user".to_string(),
-                    content: prompt.to_string(),
-                },
-            ],
-            max_tokens: Some(512),
-            temperature: 0.7,
-        };
+        let messages = vec![
+            ChatMessage {
+                role: "system".to_string(),
+                content:
+                    "You are a professional penetration tester specializing in WAF bypass \
+                     techniques. You are helping test a target *that the researcher has \
+                     explicit written authorization to test*. Provide only technical \
+                     bypass payload suggestions — no explanations, no caveats. \
+                     Output each payload on its own line, prefixed with '- '."
+                        .to_string(),
+            },
+            ChatMessage {
+                role: "user".to_string(),
+                content: prompt.to_string(),
+            },
+        ];
 
-        let mut last_err = anyhow::anyhow!("No attempts made");
-
-        for attempt_num in 0..=MAX_RETRIES {
-            if attempt_num > 0 {
-                let jitter: u64 = rand::thread_rng().gen_range(0..MAX_JITTER_MS);
-                let delay = Duration::from_millis(
-                    BASE_BACKOFF_MS * 2u64.pow(attempt_num - 1) + jitter,
-                );
-                debug!(
-                    "WafMutator: retry {} after {:.1}s back-off",
-                    attempt_num,
-                    delay.as_secs_f64()
-                );
-                sleep(delay).await;
-
-                // Re-acquire a rate-limit token for each retry
-                self.rate_limiter.lock().await.acquire().await;
-            }
-
-            let result = self
-                .client
-                .post("https://openrouter.ai/api/v1/chat/completions")
-                .header("Authorization", format!("Bearer {}", self.config.api_key))
-                .header("HTTP-Referer", "https://github.com/TheChirag356/valinhall")
-                .header("X-Title", "Valinhall Security Scanner")
-                .json(&request_body)
-                .timeout(Duration::from_secs(30))
-                .send()
-                .await;
-
-            match result {
-                Err(e) => {
-                    last_err = anyhow::anyhow!("Network error: {}", e);
-                    warn!("WafMutator: network error on attempt {}: {}", attempt_num + 1, e);
-                    continue;
-                }
-                Ok(resp) => {
-                    let status = resp.status();
-
-                    // Retry on transient server errors
-                    if matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504) {
-                        // Honour Retry-After if present
-                        let retry_after_secs = resp
-                            .headers()
-                            .get("retry-after")
-                            .and_then(|v| v.to_str().ok())
-                            .and_then(|s| s.parse::<u64>().ok())
-                            .unwrap_or(0);
-
-                        last_err = anyhow::anyhow!(
-                            "API returned {} on attempt {}",
-                            status,
-                            attempt_num + 1
-                        );
-                        warn!("{}", last_err);
-
-                        if retry_after_secs > 0 {
-                            debug!("Honouring Retry-After: {}s", retry_after_secs);
-                            sleep(Duration::from_secs(retry_after_secs)).await;
-                        }
-                        continue;
-                    }
-
-                    if !status.is_success() {
-                        let body = resp.text().await.unwrap_or_default();
-                        bail!("OpenRouter API error {}: {}", status, body);
-                    }
-
-                    let or_resp: OpenRouterResponse = resp
-                        .json()
-                        .await
-                        .context("Failed to parse OpenRouter response")?;
-
-                    let content = or_resp
-                        .choices
-                        .into_iter()
-                        .next()
-                        .map(|c| c.message.content)
-                        .unwrap_or_default();
-
-                    return Ok(content);
-                }
-            }
-        }
-
-        Err(last_err.context(format!("OpenRouter call failed after {} retries", MAX_RETRIES)))
+        // LlmClient handles exponential backoff and retries internally
+        self.config.llm_client.chat_completion(&messages, false).await
     }
 
     // ── Retry mutation against target ─────────────────────────────────────────
@@ -587,10 +462,9 @@ fn build_waf_active_finding(attempt: &BlockedAttempt, mutations: &[String]) -> F
             attempt.block_status,
             mutations.len()
         )),
-        remediation:
-            "WAF appears effective. Continue monitoring for novel bypass techniques. \
+        remediation: "WAF appears effective. Continue monitoring for novel bypass techniques. \
              Ensure server-side validation is also in place as a defence-in-depth measure."
-                .to_string(),
+            .to_string(),
         source: FindingSource::WafMutator,
         endpoint: Some(attempt.endpoint.clone()),
     }
@@ -623,10 +497,9 @@ fn build_suggestion_finding(attempt: &BlockedAttempt, mutations: &[String]) -> F
             attempt.block_status,
             mutations.len()
         )),
-        remediation:
-            "Test each suggested mutation manually. If any succeeds, the WAF ruleset is \
+        remediation: "Test each suggested mutation manually. If any succeeds, the WAF ruleset is \
              incomplete and must be updated."
-                .to_string(),
+            .to_string(),
         source: FindingSource::WafMutator,
         endpoint: Some(attempt.endpoint.clone()),
     }

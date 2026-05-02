@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Valinhall Extension</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      width: 300px;
+      padding: 16px;
+      background-color: #121212;
+      color: #ffffff;
+      margin: 0;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid #333;
+    }
+    h1 {
+      font-size: 18px;
+      margin: 0;
+      color: #00e676;
+    }
+    .status-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      margin-right: 8px;
+    }
+    .connected {
+      background-color: #00e676;
+      box-shadow: 0 0 5px #00e676;
+    }
+    .disconnected {
+      background-color: #ff3d00;
+      box-shadow: 0 0 5px #ff3d00;
+    }
+    .btn {
+      background-color: #333;
+      color: white;
+      border: 1px solid #555;
+      padding: 8px 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: 500;
+      transition: background-color 0.2s;
+    }
+    .btn:hover {
+      background-color: #444;
+    }
+    .btn:active {
+      background-color: #222;
+    }
+    .section {
+      margin-top: 16px;
+    }
+    .section-title {
+      font-size: 14px;
+      color: #aaa;
+      margin-bottom: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Valinhall LLM Testing</h1>
+  </div>
+  
+  <div class="status-container">
+    <div id="statusDot" class="status-dot disconnected"></div>
+    <span id="statusText">CLI Disconnected</span>
+  </div>
+
+  <div class="section">
+    <div class="section-title">Manual Actions</div>
+    <button id="extractContextBtn" class="btn">Extract Page Context</button>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

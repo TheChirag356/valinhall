@@ -11,3 +11,5 @@ pub mod supply;
 pub mod vuln_tester;
 pub mod waf_mutator;
 pub mod xxe_scanner;
+pub mod ext_agent;
+pub mod llm;
